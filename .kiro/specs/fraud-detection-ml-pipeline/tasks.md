@@ -64,10 +64,10 @@ This implementation plan breaks down the fraud detection ML pipeline into discre
     - **Property 5: Error Handling**
     - **Validates: Requirements 10.4, 15.1**
   
-  - [-] 3.6 Git commit and push
+  - [x] 3.6 Git commit and push
     - **Git commit and push**: "Implement WorkflowLambdaHandler base class"
 
-- [~] 4. Checkpoint - Ensure base handler tests pass
+- [-] 4. Checkpoint - Ensure base handler tests pass
   - Ensure all tests pass, ask the user if questions arise.
   - **Git commit and push**: "Checkpoint: Base handler tests passing"
 
