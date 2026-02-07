@@ -1,0 +1,57 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+*.sw?
+.#*
+*#
+*~
+/build
+/code
+.gradletasknamecache
+
+# IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# NetBeans
+nb-configuration.xml
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# AWS
+.aws-sam/
+
+# CDK
+cdk.out/
+cdk.context.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Kiro
+.kiro/cache/
