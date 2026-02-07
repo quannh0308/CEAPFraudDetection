@@ -6,7 +6,7 @@ This implementation plan breaks down the fraud detection ML pipeline into discre
 
 ## Tasks
 
-- [-] 1. Set up project structure and dependencies
+- [x] 1. Set up project structure and dependencies
   - Create Gradle multi-module project in CEAPFraudDetection workspace
   - Add CEAP platform as Git submodule at `ceap-platform/`
   - Configure Gradle dependencies: AWS SDK v2, Kotlin, Jackson, Kotest
@@ -16,22 +16,22 @@ This implementation plan breaks down the fraud detection ML pipeline into discre
   - _Requirements: 1.1, 1.2, 10.1_
 
 - [ ] 2. Implement core data models
-  - [~] 2.1 Create Transaction and ScoredTransaction data classes
+  - [x] 2.1 Create Transaction and ScoredTransaction data classes
     - Define Transaction with id, timestamp, amount, merchantCategory, features
     - Define ScoredTransaction extending Transaction with fraudScore and scoringTimestamp
     - Add Jackson annotations for JSON serialization
     - _Requirements: 6.1, 6.4, 7.3_
   
-  - [~] 2.2 Write property test for Transaction model
+  - [x] 2.2 Write property test for Transaction model
     - **Property 10: Fraud Score Range**
     - **Validates: Requirements 6.4**
   
-  - [~] 2.3 Create workflow models (ExecutionContext, StageResult)
+  - [x] 2.3 Create workflow models (ExecutionContext, StageResult)
     - Define ExecutionContext with executionId, currentStage, previousStage, workflowBucket, initialData
     - Define StageResult with status, stage, recordsProcessed, errorMessage
     - _Requirements: 2.1, 10.4_
   
-  - [~] 2.4 Git commit and push
+  - [-] 2.4 Git commit and push
     - **Git commit and push**: "Implement core data models"
 
 
