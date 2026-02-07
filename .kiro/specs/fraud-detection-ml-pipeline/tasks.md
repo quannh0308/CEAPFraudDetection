@@ -31,40 +31,40 @@ This implementation plan breaks down the fraud detection ML pipeline into discre
     - Define StageResult with status, stage, recordsProcessed, errorMessage
     - _Requirements: 2.1, 10.4_
   
-  - [-] 2.4 Git commit and push
+  - [x] 2.4 Git commit and push
     - **Git commit and push**: "Implement core data models"
 
 
 - [ ] 3. Implement WorkflowLambdaHandler base class
-  - [~] 3.1 Create abstract WorkflowLambdaHandler class
+  - [x] 3.1 Create abstract WorkflowLambdaHandler class
     - Implement RequestHandler interface for Lambda
     - Add S3Client and ObjectMapper initialization
     - Implement handleRequest method with error handling
     - _Requirements: 1.3, 10.2, 10.4_
   
-  - [~] 3.2 Implement S3 input reading logic
+  - [x] 3.2 Implement S3 input reading logic
     - Add readInput method with convention-based path resolution
     - Handle first stage (initialData) vs non-first stage (S3) logic
     - Implement S3 error handling (403, 404, 503, 500)
     - _Requirements: 2.3, 2.4, 3.1, 13.2, 15.1_
   
-  - [~] 3.3 Implement S3 output writing logic
+  - [x] 3.3 Implement S3 output writing logic
     - Add writeOutput method with convention-based path resolution
     - Implement S3 error handling for writes
     - Add comprehensive logging for S3 operations
     - _Requirements: 2.2, 2.5, 13.1, 13.3_
   
-  - [~] 3.4 Write property tests for S3 orchestration
+  - [x] 3.4 Write property tests for S3 orchestration
     - **Property 1: S3 Output Convention**
     - **Property 2: S3 Input Convention**
     - **Property 3: S3 Path Construction**
     - **Validates: Requirements 2.5, 3.1, 13.1, 13.2, 13.3**
   
-  - [~] 3.5 Write property test for error handling
+  - [x] 3.5 Write property test for error handling
     - **Property 5: Error Handling**
     - **Validates: Requirements 10.4, 15.1**
   
-  - [~] 3.6 Git commit and push
+  - [-] 3.6 Git commit and push
     - **Git commit and push**: "Implement WorkflowLambdaHandler base class"
 
 - [~] 4. Checkpoint - Ensure base handler tests pass
