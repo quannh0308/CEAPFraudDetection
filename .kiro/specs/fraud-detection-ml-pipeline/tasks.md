@@ -101,13 +101,13 @@ This implementation plan breaks down the fraud detection ML pipeline into discre
     - Return training job metadata
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
   
-  - [ ] 6.2 Write unit tests for TrainHandler
+  - [x] 6.2 Write unit tests for TrainHandler
     - Test training job configuration
     - Test training job creation with mocked SageMaker client
     - Test error handling for training failures
     - _Requirements: 3.2, 3.3_
   
-  - [ ] 6.3 Git commit and push
+  - [-] 6.3 Git commit and push
     - **Git commit and push**: "Implement TrainHandler"
 
 

@@ -48,11 +48,11 @@ import software.amazon.awssdk.services.sagemaker.waiters.SageMakerWaiter
  * }
  * ```
  */
-class TrainHandler : WorkflowLambdaHandler() {
-    
-    private val sageMakerClient: SageMakerClient = SageMakerClient.builder().build()
+open class TrainHandler(
+    private val sageMakerClient: SageMakerClient = SageMakerClient.builder().build(),
     private val sageMakerExecutionRoleArn: String = System.getenv("SAGEMAKER_EXECUTION_ROLE_ARN")
         ?: throw IllegalStateException("SAGEMAKER_EXECUTION_ROLE_ARN environment variable must be set")
+) : WorkflowLambdaHandler() {
     
     /**
      * Processes the training stage by configuring and launching a SageMaker training job.
