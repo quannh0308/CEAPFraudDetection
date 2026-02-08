@@ -56,8 +56,7 @@ open class EvaluateHandler(
     private val sageMakerClient: SageMakerClient = SageMakerClient.builder().build(),
     private val sageMakerRuntimeClient: SageMakerRuntimeClient = SageMakerRuntimeClient.builder().build(),
     private val sageMakerExecutionRoleArn: String = System.getenv("SAGEMAKER_EXECUTION_ROLE_ARN")
-        ?: throw IllegalStateException("SAGEMAKER_EXECUTION_ROLE_ARN environment variable must be set"),
-    private val testDataPath: String = System.getenv("TEST_DATA_PATH") ?: "s3://fraud-detection-data/prepared/test.parquet"
+        ?: throw IllegalStateException("SAGEMAKER_EXECUTION_ROLE_ARN environment variable must be set")
 ) : WorkflowLambdaHandler() {
     
     /**
@@ -78,11 +77,15 @@ open class EvaluateHandler(
      * @throws IllegalStateException if model accuracy is below 0.90 threshold
      */
     override fun processData(input: JsonNode): JsonNode {
-        // 1. Extract model artifact path from input
+        // 1. Extract model artifact path and test data path from input
         val modelArtifactPath = input.get("modelArtifactPath")?.asText()
             ?: throw IllegalArgumentException("modelArtifactPath is required in input")
         
+        val testDataPath = input.get("testDataPath")?.asText()
+            ?: throw IllegalArgumentException("testDataPath is required in input")
+        
         logger.info("Evaluating model: $modelArtifactPath")
+        logger.info("Test data path: $testDataPath")
         
         // 2. Create temporary SageMaker endpoint for evaluation
         val timestamp = System.currentTimeMillis()
@@ -145,8 +148,8 @@ open class EvaluateHandler(
             logger.info("Endpoint is in service: $endpointName")
             
             // 3. Load test data and run predictions
-            val testData = loadTestData()
-            logger.info("Loaded ${testData.size} test records")
+            val testData = loadTestData(testDataPath)
+            logger.info("Loaded ${testData.size} test records from $testDataPath")
             
             val predictions = mutableListOf<Double>()
             val actuals = mutableListOf<Int>()
@@ -194,15 +197,30 @@ open class EvaluateHandler(
     }
     
     /**
-     * Loads test data for model evaluation.
+     * Loads test data for model evaluation from S3.
      * 
-     * For now, this returns mock test data. In production, this would load from S3.
+     * In production, this would load the actual Parquet file from S3.
+     * For now, this returns mock test data since we don't have AWS credentials
+     * and the actual Parquet file loading would require additional dependencies.
      * 
+     * TODO: Implement actual S3 Parquet file loading when deploying to AWS
+     * 
+     * @param testDataPath S3 path to the test data Parquet file
      * @return List of test records with features and labels
      */
-    private fun loadTestData(): List<TestRecord> {
-        // Mock test data for evaluation
-        // In production, this would load from S3 test data path
+    private fun loadTestData(testDataPath: String): List<TestRecord> {
+        logger.info("Loading test data from: $testDataPath")
+        
+        // TODO: In production, load actual Parquet file from S3
+        // This would require:
+        // 1. Download Parquet file from S3 using s3Client
+        // 2. Parse Parquet file using Apache Parquet library
+        // 3. Extract features and labels
+        // 4. Return list of TestRecord objects
+        
+        // For now, return mock test data for testing purposes
+        logger.warn("Using mock test data. In production, this should load from S3: $testDataPath")
+        
         return listOf(
             TestRecord(mapOf("V1" to -1.36, "V2" to -0.07, "Amount" to 149.62), 0),
             TestRecord(mapOf("V1" to 2.45, "V2" to 1.23, "Amount" to 2500.00), 1),

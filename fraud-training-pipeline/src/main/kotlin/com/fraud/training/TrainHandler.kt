@@ -195,10 +195,16 @@ open class TrainHandler(
         val modelArtifactPath = describeResponse.modelArtifacts().s3ModelArtifacts()
         logger.info("Training completed successfully. Model artifact: $modelArtifactPath")
         
+        // Pass through testDataPath for EvaluateStage
+        val testDataPath = input.get("testDataPath")?.asText()
+        
         return objectMapper.createObjectNode().apply {
             put("trainingJobName", trainingJobName)
             put("modelArtifactPath", modelArtifactPath)
             put("trainingJobStatus", trainingJobStatus.toString())
+            if (testDataPath != null) {
+                put("testDataPath", testDataPath)
+            }
         }
     }
 }

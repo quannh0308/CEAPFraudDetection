@@ -27,9 +27,8 @@ import software.amazon.awssdk.services.sagemakerruntime.model.InvokeEndpointResp
 class TestableEvaluateHandler(
     sageMakerClient: SageMakerClient,
     sageMakerRuntimeClient: SageMakerRuntimeClient,
-    sageMakerExecutionRoleArn: String,
-    testDataPath: String = "s3://fraud-detection-data/prepared/test.parquet"
-) : EvaluateHandler(sageMakerClient, sageMakerRuntimeClient, sageMakerExecutionRoleArn, testDataPath) {
+    sageMakerExecutionRoleArn: String
+) : EvaluateHandler(sageMakerClient, sageMakerRuntimeClient, sageMakerExecutionRoleArn) {
     public override fun processData(input: JsonNode): JsonNode {
         return super.processData(input)
     }
@@ -131,6 +130,7 @@ class EvaluateHandlerTest : FunSpec({
             put("trainingJobName", "fraud-detection-1234567890")
             put("modelArtifactPath", "s3://fraud-detection-models/fraud-detection-1234567890/output/model.tar.gz")
             put("trainingJobStatus", "Completed")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
         }
         
         // Execute
@@ -212,6 +212,7 @@ class EvaluateHandlerTest : FunSpec({
             put("trainingJobName", "fraud-detection-1234567890")
             put("modelArtifactPath", "s3://fraud-detection-models/fraud-detection-1234567890/output/model.tar.gz")
             put("trainingJobStatus", "Completed")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
         }
         
         // Execute and verify exception
@@ -285,6 +286,7 @@ class EvaluateHandlerTest : FunSpec({
             put("trainingJobName", "fraud-detection-1234567890")
             put("modelArtifactPath", "s3://fraud-detection-models/fraud-detection-1234567890/output/model.tar.gz")
             put("trainingJobStatus", "Completed")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
         }
         
         // Execute
@@ -367,6 +369,7 @@ class EvaluateHandlerTest : FunSpec({
             put("trainingJobName", "fraud-detection-1234567890")
             put("modelArtifactPath", "s3://fraud-detection-models/fraud-detection-1234567890/output/model.tar.gz")
             put("trainingJobStatus", "Completed")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
         }
         
         // Execute and verify exception
@@ -395,6 +398,7 @@ class EvaluateHandlerTest : FunSpec({
         val input = objectMapper.createObjectNode().apply {
             put("trainingJobName", "fraud-detection-1234567890")
             put("trainingJobStatus", "Completed")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
         }
         
         // Execute and verify exception
@@ -467,6 +471,7 @@ class EvaluateHandlerTest : FunSpec({
             put("trainingJobName", "fraud-detection-1234567890")
             put("modelArtifactPath", "s3://fraud-detection-models/fraud-detection-1234567890/output/model.tar.gz")
             put("trainingJobStatus", "Completed")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
         }
         
         // Execute

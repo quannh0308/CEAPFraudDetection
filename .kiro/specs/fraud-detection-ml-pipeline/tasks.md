@@ -4,6 +4,17 @@
 
 This implementation plan breaks down the fraud detection ML pipeline into discrete coding tasks. The system consists of two Step Functions workflows (training and inference) with Lambda handlers in Kotlin and a Glue job in Python for data preparation. All handlers extend the CEAP WorkflowLambdaHandler base class for S3 orchestration.
 
+## Git Commit Guidelines
+
+When completing "Git commit and push" tasks, commits should include:
+- A clear, descriptive commit title
+- A detailed commit message body that explains:
+  - What was implemented
+  - Key changes made to each file
+  - How the implementation satisfies the requirements
+  - Any important technical decisions or patterns used
+- Reference to the relevant requirements from the design document
+
 ## Tasks
 
 - [x] 1. Set up project structure and dependencies
@@ -107,12 +118,12 @@ This implementation plan breaks down the fraud detection ML pipeline into discre
     - Test error handling for training failures
     - _Requirements: 3.2, 3.3_
   
-  - [-] 6.3 Git commit and push
+  - [x] 6.3 Git commit and push
     - **Git commit and push**: "Implement TrainHandler"
 
 
-- [ ] 7. Implement EvaluateHandler
-  - [ ] 7.1 Create EvaluateHandler extending WorkflowLambdaHandler
+- [x] 7. Implement EvaluateHandler
+  - [x] 7.1 Create EvaluateHandler extending WorkflowLambdaHandler
     - Implement processData method
     - Create temporary SageMaker endpoint for evaluation
     - Load test data and run predictions
@@ -121,13 +132,13 @@ This implementation plan breaks down the fraud detection ML pipeline into discre
     - Clean up evaluation endpoint
     - _Requirements: 3.4, 3.5, 3.6_
   
-  - [ ] 7.2 Write unit tests for EvaluateHandler
+  - [x] 7.2 Write unit tests for EvaluateHandler
     - Test model evaluation with mocked endpoint
     - Test accuracy threshold validation (should fail if < 0.90)
     - Test metrics calculation
     - _Requirements: 3.6_
   
-  - [ ] 7.3 Git commit and push
+  - [x] 7.3 Git commit and push
     - **Git commit and push**: "Implement EvaluateHandler"
 
 - [ ] 8. Implement DeployHandler
