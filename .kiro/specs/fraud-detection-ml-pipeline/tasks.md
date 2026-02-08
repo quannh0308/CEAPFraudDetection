@@ -89,11 +89,11 @@ This implementation plan breaks down the fraud detection ML pipeline into discre
     - **Property 8: SageMaker Output Format**
     - **Validates: Requirements 2.4**
   
-  - [-] 5.4 Git commit and push
+  - [x] 5.4 Git commit and push
     - **Git commit and push**: "Implement Glue data preparation script"
 
 - [ ] 6. Implement TrainHandler
-  - [ ] 6.1 Create TrainHandler extending WorkflowLambdaHandler
+  - [x] 6.1 Create TrainHandler extending WorkflowLambdaHandler
     - Implement processData method
     - Add SageMaker client initialization
     - Configure training job with XGBoost algorithm
