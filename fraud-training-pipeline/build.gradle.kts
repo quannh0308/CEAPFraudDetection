@@ -26,6 +26,13 @@ dependencies {
     // AWS Lambda
     implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
     implementation("com.amazonaws:aws-lambda-java-events:3.11.3")
+    
+    // Apache Parquet for reading test data (compileOnly - will be provided at runtime in AWS Lambda)
+    compileOnly("org.apache.parquet:parquet-hadoop:1.13.1")
+    compileOnly("org.apache.parquet:parquet-column:1.13.1")
+    compileOnly("org.apache.parquet:parquet-common:1.13.1")
+    compileOnly("org.apache.hadoop:hadoop-common:3.3.6")
+    compileOnly("org.apache.hadoop:hadoop-aws:3.3.6")
 }
 
 tasks.shadowJar {
