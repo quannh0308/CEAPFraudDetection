@@ -230,8 +230,8 @@ When completing "Git commit and push" tasks, commits should include:
     - Ensured training pipeline is ready for infrastructure deployment"
 
 
-- [ ] 10. Implement ScoreHandler
-  - [ ] 10.1 Create ScoreHandler extending WorkflowLambdaHandler
+- [x] 10. Implement ScoreHandler
+  - [x] 10.1 Create ScoreHandler extending WorkflowLambdaHandler
     - Implement processData method
     - Read current endpoint name from config bucket
     - Load transaction batch from S3
@@ -239,17 +239,17 @@ When completing "Git commit and push" tasks, commits should include:
     - Create ScoredTransaction objects with fraud scores
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
   
-  - [ ] 10.2 Write property test for endpoint invocation
+  - [x] 10.2 Write property test for endpoint invocation
     - **Property 11: Endpoint Invocation**
     - **Validates: Requirements 6.3**
   
-  - [ ] 10.3 Write unit tests for ScoreHandler
+  - [x] 10.3 Write unit tests for ScoreHandler
     - Test transaction batch loading
     - Test endpoint invocation with mocked SageMaker Runtime client
     - Test scored transaction creation
     - _Requirements: 6.1, 6.2, 6.3_
   
-  - [ ] 10.4 Git commit and push
+  - [x] 10.4 Git commit and push
     - **Git commit and push**: "feat: implement ScoreHandler for real-time fraud scoring
     
     - Created ScoreHandler extending WorkflowLambdaHandler for scoring workflow stage
@@ -261,25 +261,25 @@ When completing "Git commit and push" tasks, commits should include:
     - Added error handling for endpoint invocation failures and retries
     - Included property tests validating endpoint invocation behavior and unit tests for batch processing"
 
-- [ ] 11. Implement StoreHandler
-  - [ ] 11.1 Create StoreHandler extending WorkflowLambdaHandler
+- [-] 11. Implement StoreHandler
+  - [x] 11.1 Create StoreHandler extending WorkflowLambdaHandler
     - Implement processData method
     - Implement DynamoDB batch write logic (max 25 items)
     - Handle unprocessed items and track error count
     - Calculate summary statistics (risk distribution, avg score)
     - _Requirements: 7.1, 7.2, 7.3, 7.5_
   
-  - [ ] 11.2 Write property test for DynamoDB write completeness
+  - [x] 11.2 Write property test for DynamoDB write completeness
     - **Property 12: DynamoDB Write Completeness**
     - **Validates: Requirements 7.2, 7.3**
   
-  - [ ] 11.3 Write unit tests for StoreHandler
+  - [x] 11.3 Write unit tests for StoreHandler
     - Test batch write with mocked DynamoDB client
     - Test unprocessed items handling
     - Test summary statistics calculation
     - _Requirements: 7.2, 7.3, 7.5_
   
-  - [ ] 11.4 Git commit and push
+  - [-] 11.4 Git commit and push
     - **Git commit and push**: "feat: implement StoreHandler for DynamoDB persistence
     
     - Created StoreHandler extending WorkflowLambdaHandler for storage workflow stage
@@ -292,7 +292,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Included property tests validating write completeness and unit tests for batch processing and statistics"
 
 
-- [ ] 12. Implement AlertHandler
+- [~] 12. Implement AlertHandler
   - [ ] 12.1 Create AlertHandler extending WorkflowLambdaHandler
     - Implement processData method
     - Filter high-risk transactions (fraud score >= 0.8)
@@ -331,7 +331,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Added alert statistics tracking (total high-risk, batches sent)
     - Included property tests validating high-risk identification, batching, and message completeness"
 
-- [ ] 13. Implement MonitorHandler
+- [~] 13. Implement MonitorHandler
   - [ ] 13.1 Create MonitorHandler extending WorkflowLambdaHandler
     - Implement processData method
     - Load historical baseline from S3 metrics
@@ -367,7 +367,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Added comprehensive logging for drift analysis and alert triggers
     - Included property tests validating drift detection thresholds and metrics persistence"
 
-- [ ] 14. Checkpoint - Ensure inference pipeline handlers pass tests
+- [~] 14. Checkpoint - Ensure inference pipeline handlers pass tests
   - Ensure all tests pass, ask the user if questions arise.
   - **Git commit and push**: "chore: checkpoint - inference pipeline handlers complete
     
@@ -378,7 +378,7 @@ When completing "Git commit and push" tasks, commits should include:
 
 
 - [ ] 15. Create CDK infrastructure stacks
-  - [ ] 15.1 Create TrainingPipelineStack
+  - [~] 15.1 Create TrainingPipelineStack
     - Define Standard workflow with 4 stages: DataPrep (Glue), Train, Evaluate, Deploy
     - Configure Glue job with data-prep.py script
     - Configure Lambda functions for Train, Evaluate, Deploy handlers
@@ -387,7 +387,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Add EventBridge schedule for weekly execution
     - _Requirements: 1.5, 5.1, 5.2, 12.1, 12.2_
   
-  - [ ] 15.2 Create InferencePipelineStack
+  - [~] 15.2 Create InferencePipelineStack
     - Define Express workflow with 4 stages: Score, Store, Alert, Monitor
     - Configure Lambda functions for all handlers
     - Set up DynamoDB table with GSI
@@ -396,7 +396,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Add EventBridge schedule for daily execution
     - _Requirements: 1.5, 9.1, 9.2, 12.1, 12.2, 12.3_
   
-  - [ ] 15.3 Write unit tests for CDK stacks
+  - [~] 15.3 Write unit tests for CDK stacks
     - Test stack synthesis
     - Verify resource creation
     - _Requirements: 12.1, 12.2_

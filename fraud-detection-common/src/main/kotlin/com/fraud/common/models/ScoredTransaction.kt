@@ -1,5 +1,6 @@
 package com.fraud.common.models
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
@@ -49,17 +50,20 @@ data class ScoredTransaction(
      * Determines if this transaction is considered high-risk based on the fraud score.
      * High-risk transactions have a fraud score >= 0.8 and trigger alerts.
      */
+    @JsonIgnore
     fun isHighRisk(): Boolean = fraudScore >= 0.8
     
     /**
      * Determines if this transaction is considered medium-risk based on the fraud score.
      * Medium-risk transactions have a fraud score between 0.5 and 0.8.
      */
+    @JsonIgnore
     fun isMediumRisk(): Boolean = fraudScore >= 0.5 && fraudScore < 0.8
     
     /**
      * Determines if this transaction is considered low-risk based on the fraud score.
      * Low-risk transactions have a fraud score < 0.5.
      */
+    @JsonIgnore
     fun isLowRisk(): Boolean = fraudScore < 0.5
 }
