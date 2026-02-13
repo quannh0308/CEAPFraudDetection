@@ -292,7 +292,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Included property tests validating write completeness and unit tests for batch processing and statistics"
 
 
-- [-] 12. Implement AlertHandler
+- [x] 12. Implement AlertHandler
   - [x] 12.1 Create AlertHandler extending WorkflowLambdaHandler
     - Implement processData method
     - Filter high-risk transactions (fraud score >= 0.8)
@@ -319,7 +319,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Test SNS publish with mocked client
     - _Requirements: 8.2, 8.3, 8.4_
   
-  - [-] 12.6 Git commit and push
+  - [x] 12.6 Git commit and push
     - **Git commit and push**: "feat: implement AlertHandler for high-risk transaction alerts
     
     - Created AlertHandler extending WorkflowLambdaHandler for alerting workflow stage
@@ -331,8 +331,8 @@ When completing "Git commit and push" tasks, commits should include:
     - Added alert statistics tracking (total high-risk, batches sent)
     - Included property tests validating high-risk identification, batching, and message completeness"
 
-- [~] 13. Implement MonitorHandler
-  - [ ] 13.1 Create MonitorHandler extending WorkflowLambdaHandler
+- [-] 13. Implement MonitorHandler
+  - [x] 13.1 Create MonitorHandler extending WorkflowLambdaHandler
     - Implement processData method
     - Load historical baseline from S3 metrics
     - Calculate distribution metrics (high/medium/low risk percentages)
@@ -341,21 +341,21 @@ When completing "Git commit and push" tasks, commits should include:
     - Write metrics to S3 for historical tracking
     - _Requirements: 14.1, 14.2, 14.3, 14.4_
   
-  - [ ] 13.2 Write property test for drift detection
+  - [x] 13.2 Write property test for drift detection
     - **Property 16: Distribution Drift Detection**
     - **Validates: Requirements 14.2**
   
-  - [ ] 13.3 Write property test for metrics persistence
+  - [x] 13.3 Write property test for metrics persistence
     - **Property 17: Metrics Persistence**
     - **Validates: Requirements 14.3**
   
-  - [ ] 13.4 Write unit tests for MonitorHandler
+  - [x] 13.4 Write unit tests for MonitorHandler
     - Test baseline calculation
     - Test drift detection with various distributions
     - Test metrics writing to S3
     - _Requirements: 14.1, 14.2, 14.3, 14.4_
   
-  - [ ] 13.5 Git commit and push
+  - [-] 13.5 Git commit and push
     - **Git commit and push**: "feat: implement MonitorHandler for distribution drift detection
     
     - Created MonitorHandler extending WorkflowLambdaHandler for monitoring workflow stage
