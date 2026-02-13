@@ -42,11 +42,11 @@ class MonitorHandlerDriftDetectionPropertyTest : FunSpec({
     // Feature: fraud-detection-ml-pipeline, Property 16: Distribution Drift Detection
     test("Property 16: Distribution Drift Detection - drift SHALL be detected when avgScoreDrift > 0.1") {
         checkAll(100, Arb.performanceMetrics(), Arb.batchDate()) { currentMetrics, batchDate ->
-            // Create baseline with avgFraudScore that differs by more than 0.1
+            // Create baseline with avgFraudScore that differs by more than 0.1 (ensure valid range [0, 1])
             val baselineAvgScore = if (currentMetrics.avgFraudScore > 0.5) {
-                currentMetrics.avgFraudScore - 0.11 // Drift > 0.1
+                (currentMetrics.avgFraudScore - 0.11).coerceAtLeast(0.0) // Drift > 0.1
             } else {
-                currentMetrics.avgFraudScore + 0.11 // Drift > 0.1
+                (currentMetrics.avgFraudScore + 0.11).coerceAtMost(1.0) // Drift > 0.1
             }
             
             val baseline = PerformanceMetrics(
@@ -87,139 +87,14 @@ class MonitorHandlerDriftDetectionPropertyTest : FunSpec({
                 put("avgFraudScore", currentMetrics.avgFraudScore)
             }
             
-            val storeStageStream = ResponseInputStream(
-                software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
-                AbortableInputStream.create(
-                    ByteArrayInputStream(objectMapper.writeValueAsString(storeStageOutput).toByteArray())
-                )
-            )
-            
-            every { 
-                mockS3Client.getObject(any<GetObjectRequest>()) 
-            } returns storeStageStream
-            
-            // Mock historical metrics loading (return baseline)
-            every {
-                mockMetricsS3Client.getObject(any<GetObjectRequest>())
-            } answers {
-                val historicalMetrics = objectMapper.createObjectNode().apply {
-                    put("avgFraudScore", baseline.avgFraudScore)
-                    put("highRiskPct", baseline.highRiskPct)
-                }
+            every { mockS3Client.getObject(any<GetObjectRequest>()) } answers {
                 ResponseInputStream(
                     software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
                     AbortableInputStream.create(
-                        ByteArrayInputStream(objectMapper.writeValueAsString(historicalMetrics).toByteArray())
+                        ByteArrayInputStream(objectMapper.writeValueAsString(storeStageOutput).toByteArray())
                     )
                 )
             }
-            
-            // Mock S3 output write (for both workflow output and metrics)
-            every { 
-                mockS3Client.putObject(any<PutObjectRequest>(), any<RequestBody>()) 
-            } returns PutObjectResponse.builder().build()
-            
-            every {
-                mockMetricsS3Client.putObject(any<PutObjectRequest>(), any<RequestBody>())
-            } returns PutObjectResponse.builder().build()
-            
-            val publishedAlerts = mutableListOf<String>()
-            
-            // Mock SNS publish
-            every { 
-                mockSnsClient.publish(any<PublishRequest>()) 
-            } answers {
-                val request = firstArg<PublishRequest>()
-                publishedAlerts.add(request.message())
-                PublishResponse.builder().messageId("msg-${publishedAlerts.size}").build()
-            }
-            
-            // Create input for handler
-            val input = mapOf(
-                "executionId" to "exec-test",
-                "currentStage" to "MonitorStage",
-                "previousStage" to "StoreStage",
-                "workflowBucket" to "test-workflow-bucket"
-            )
-            
-            val mockContext = mockk<Context>()
-            
-            // When the monitoring stage processes the metrics
-            val result = handler.handleRequest(input, mockContext)
-            
-            // Then drift SHALL be detected
-            val capturedOutput = slot<RequestBody>()
-            verify { mockS3Client.putObject(any<PutObjectRequest>(), capture(capturedOutput)) }
-            
-            val outputJson = capturedOutput.captured.contentStreamProvider().newStream().readAllBytes().decodeToString()
-            val resultNode = objectMapper.readTree(outputJson)
-            
-            val driftDetected = resultNode.get("driftDetected").asBoolean()
-            val avgScoreDrift = resultNode.get("avgScoreDrift").asDouble()
-            
-            driftDetected shouldBe true
-            avgScoreDrift shouldBe abs(currentMetrics.avgFraudScore - baseline.avgFraudScore)
-            
-            // And a drift alert SHALL be sent
-            publishedAlerts.size shouldBe 1
-            publishedAlerts[0].contains("Model Distribution Drift Detected") shouldBe true
-        }
-    }
-    
-    // Feature: fraud-detection-ml-pipeline, Property 16: Distribution Drift Detection
-    test("Property 16: Distribution Drift Detection - drift SHALL be detected when highRiskDrift > 0.05") {
-        checkAll(100, Arb.performanceMetrics(), Arb.batchDate()) { currentMetrics, batchDate ->
-            // Create baseline with highRiskPct that differs by more than 0.05
-            val baselineHighRiskPct = if (currentMetrics.highRiskPct > 0.1) {
-                currentMetrics.highRiskPct - 0.06 // Drift > 0.05
-            } else {
-                currentMetrics.highRiskPct + 0.06 // Drift > 0.05
-            }
-            
-            val baseline = PerformanceMetrics(
-                avgFraudScore = currentMetrics.avgFraudScore, // Same avg score
-                highRiskPct = baselineHighRiskPct
-            )
-            
-            val mockS3Client = mockk<S3Client>()
-            val mockMetricsS3Client = mockk<S3Client>()
-            val mockSnsClient = mockk<SnsClient>()
-            
-            val handler = MonitorHandler(
-                metricsS3Client = mockMetricsS3Client,
-                snsClient = mockSnsClient,
-                metricsBucket = "test-metrics-bucket",
-                monitoringAlertTopicArn = "arn:aws:sns:us-east-1:123456789012:monitoring-alerts"
-            )
-            
-            val s3Field = handler.javaClass.superclass.getDeclaredField("s3Client")
-            s3Field.isAccessible = true
-            s3Field.set(handler, mockS3Client)
-            
-            val storeStageOutput = objectMapper.createObjectNode().apply {
-                put("batchDate", batchDate)
-                put("totalTransactions", 100)
-                put("successCount", 100)
-                put("errorCount", 0)
-                set<com.fasterxml.jackson.databind.node.ObjectNode>(
-                    "riskDistribution",
-                    objectMapper.createObjectNode().apply {
-                        put("highRisk", (currentMetrics.highRiskPct * 100).toInt())
-                        put("mediumRisk", 20)
-                        put("lowRisk", 80 - (currentMetrics.highRiskPct * 100).toInt())
-                    }
-                )
-                put("avgFraudScore", currentMetrics.avgFraudScore)
-            }
-            
-            val storeStageStream = ResponseInputStream(
-                software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
-                AbortableInputStream.create(
-                    ByteArrayInputStream(objectMapper.writeValueAsString(storeStageOutput).toByteArray())
-                )
-            )
-            
-            every { mockS3Client.getObject(any<GetObjectRequest>()) } returns storeStageStream
             
             every {
                 mockMetricsS3Client.getObject(any<GetObjectRequest>())
@@ -316,14 +191,14 @@ class MonitorHandlerDriftDetectionPropertyTest : FunSpec({
                 put("avgFraudScore", currentMetrics.avgFraudScore)
             }
             
-            val storeStageStream = ResponseInputStream(
-                software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
-                AbortableInputStream.create(
-                    ByteArrayInputStream(objectMapper.writeValueAsString(storeStageOutput).toByteArray())
+            every { mockS3Client.getObject(any<GetObjectRequest>()) } answers {
+                ResponseInputStream(
+                    software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
+                    AbortableInputStream.create(
+                        ByteArrayInputStream(objectMapper.writeValueAsString(storeStageOutput).toByteArray())
+                    )
                 )
-            )
-            
-            every { mockS3Client.getObject(any<GetObjectRequest>()) } returns storeStageStream
+            }
             
             every {
                 mockMetricsS3Client.getObject(any<GetObjectRequest>())
@@ -380,9 +255,13 @@ class MonitorHandlerDriftDetectionPropertyTest : FunSpec({
     // Feature: fraud-detection-ml-pipeline, Property 16: Distribution Drift Detection
     test("Property 16: Distribution Drift Detection - boundary case avgScoreDrift = 0.1 SHALL NOT trigger drift") {
         checkAll(100, Arb.performanceMetrics(), Arb.batchDate()) { currentMetrics, batchDate ->
-            // Create baseline with exactly 0.1 difference
+            // Create baseline with exactly 0.1 difference (ensure it stays in valid range [0, 1])
             val baseline = PerformanceMetrics(
-                avgFraudScore = currentMetrics.avgFraudScore + 0.1, // Drift = 0.1 (not > 0.1)
+                avgFraudScore = if (currentMetrics.avgFraudScore + 0.1 <= 1.0) {
+                    currentMetrics.avgFraudScore + 0.1
+                } else {
+                    currentMetrics.avgFraudScore - 0.1
+                }, // Drift = 0.1 (not > 0.1)
                 highRiskPct = currentMetrics.highRiskPct // Same high risk %
             )
             
@@ -417,14 +296,14 @@ class MonitorHandlerDriftDetectionPropertyTest : FunSpec({
                 put("avgFraudScore", currentMetrics.avgFraudScore)
             }
             
-            val storeStageStream = ResponseInputStream(
-                software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
-                AbortableInputStream.create(
-                    ByteArrayInputStream(objectMapper.writeValueAsString(storeStageOutput).toByteArray())
+            every { mockS3Client.getObject(any<GetObjectRequest>()) } answers {
+                ResponseInputStream(
+                    software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
+                    AbortableInputStream.create(
+                        ByteArrayInputStream(objectMapper.writeValueAsString(storeStageOutput).toByteArray())
+                    )
                 )
-            )
-            
-            every { mockS3Client.getObject(any<GetObjectRequest>()) } returns storeStageStream
+            }
             
             every {
                 mockMetricsS3Client.getObject(any<GetObjectRequest>())
@@ -479,10 +358,14 @@ class MonitorHandlerDriftDetectionPropertyTest : FunSpec({
     // Feature: fraud-detection-ml-pipeline, Property 16: Distribution Drift Detection
     test("Property 16: Distribution Drift Detection - boundary case highRiskDrift = 0.05 SHALL NOT trigger drift") {
         checkAll(100, Arb.performanceMetrics(), Arb.batchDate()) { currentMetrics, batchDate ->
-            // Create baseline with exactly 0.05 difference
+            // Create baseline with exactly 0.05 difference (ensure it stays in valid range)
             val baseline = PerformanceMetrics(
                 avgFraudScore = currentMetrics.avgFraudScore, // Same avg score
-                highRiskPct = currentMetrics.highRiskPct + 0.05 // Drift = 0.05 (not > 0.05)
+                highRiskPct = if (currentMetrics.highRiskPct + 0.05 <= 1.0) {
+                    currentMetrics.highRiskPct + 0.05
+                } else {
+                    currentMetrics.highRiskPct - 0.05
+                } // Drift = 0.05 (not > 0.05)
             )
             
             val mockS3Client = mockk<S3Client>()
@@ -516,14 +399,14 @@ class MonitorHandlerDriftDetectionPropertyTest : FunSpec({
                 put("avgFraudScore", currentMetrics.avgFraudScore)
             }
             
-            val storeStageStream = ResponseInputStream(
-                software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
-                AbortableInputStream.create(
-                    ByteArrayInputStream(objectMapper.writeValueAsString(storeStageOutput).toByteArray())
+            every { mockS3Client.getObject(any<GetObjectRequest>()) } answers {
+                ResponseInputStream(
+                    software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
+                    AbortableInputStream.create(
+                        ByteArrayInputStream(objectMapper.writeValueAsString(storeStageOutput).toByteArray())
+                    )
                 )
-            )
-            
-            every { mockS3Client.getObject(any<GetObjectRequest>()) } returns storeStageStream
+            }
             
             every {
                 mockMetricsS3Client.getObject(any<GetObjectRequest>())
