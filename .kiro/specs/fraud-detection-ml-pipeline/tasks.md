@@ -279,7 +279,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Test summary statistics calculation
     - _Requirements: 7.2, 7.3, 7.5_
   
-  - [-] 11.4 Git commit and push
+  - [x] 11.4 Git commit and push
     - **Git commit and push**: "feat: implement StoreHandler for DynamoDB persistence
     
     - Created StoreHandler extending WorkflowLambdaHandler for storage workflow stage
@@ -292,8 +292,8 @@ When completing "Git commit and push" tasks, commits should include:
     - Included property tests validating write completeness and unit tests for batch processing and statistics"
 
 
-- [~] 12. Implement AlertHandler
-  - [ ] 12.1 Create AlertHandler extending WorkflowLambdaHandler
+- [-] 12. Implement AlertHandler
+  - [x] 12.1 Create AlertHandler extending WorkflowLambdaHandler
     - Implement processData method
     - Filter high-risk transactions (fraud score >= 0.8)
     - Implement alert batching (max 100 per message)
@@ -301,25 +301,25 @@ When completing "Git commit and push" tasks, commits should include:
     - Publish alerts to SNS topic
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
   
-  - [ ] 12.2 Write property test for high-risk identification
+  - [x] 12.2 Write property test for high-risk identification
     - **Property 13: High-Risk Transaction Identification**
     - **Validates: Requirements 8.2**
   
-  - [ ] 12.3 Write property test for alert batching
+  - [x] 12.3 Write property test for alert batching
     - **Property 15: Alert Batching**
     - **Validates: Requirements 8.5**
   
-  - [ ] 12.4 Write property test for alert message completeness
+  - [x] 12.4 Write property test for alert message completeness
     - **Property 14: Alert Message Completeness**
     - **Validates: Requirements 8.4**
   
-  - [ ] 12.5 Write unit tests for AlertHandler
+  - [x] 12.5 Write unit tests for AlertHandler
     - Test high-risk filtering
     - Test alert message formatting
     - Test SNS publish with mocked client
     - _Requirements: 8.2, 8.3, 8.4_
   
-  - [ ] 12.6 Git commit and push
+  - [-] 12.6 Git commit and push
     - **Git commit and push**: "feat: implement AlertHandler for high-risk transaction alerts
     
     - Created AlertHandler extending WorkflowLambdaHandler for alerting workflow stage
@@ -377,8 +377,8 @@ When completing "Git commit and push" tasks, commits should include:
     - Ensured inference pipeline is ready for infrastructure deployment"
 
 
-- [ ] 15. Create CDK infrastructure stacks
-  - [~] 15.1 Create TrainingPipelineStack
+- [~] 15. Create CDK infrastructure stacks
+  - [ ] 15.1 Create TrainingPipelineStack
     - Define Standard workflow with 4 stages: DataPrep (Glue), Train, Evaluate, Deploy
     - Configure Glue job with data-prep.py script
     - Configure Lambda functions for Train, Evaluate, Deploy handlers
@@ -387,7 +387,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Add EventBridge schedule for weekly execution
     - _Requirements: 1.5, 5.1, 5.2, 12.1, 12.2_
   
-  - [~] 15.2 Create InferencePipelineStack
+  - [ ] 15.2 Create InferencePipelineStack
     - Define Express workflow with 4 stages: Score, Store, Alert, Monitor
     - Configure Lambda functions for all handlers
     - Set up DynamoDB table with GSI
@@ -396,7 +396,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Add EventBridge schedule for daily execution
     - _Requirements: 1.5, 9.1, 9.2, 12.1, 12.2, 12.3_
   
-  - [~] 15.3 Write unit tests for CDK stacks
+  - [ ] 15.3 Write unit tests for CDK stacks
     - Test stack synthesis
     - Verify resource creation
     - _Requirements: 12.1, 12.2_
