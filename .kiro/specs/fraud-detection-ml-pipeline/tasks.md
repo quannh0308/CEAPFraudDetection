@@ -23,7 +23,12 @@ When completing "Git commit and push" tasks, commits should include:
   - Configure Gradle dependencies: AWS SDK v2, Kotlin, Jackson, Kotest
   - Create module structure: `fraud-detection-common`, `fraud-detection-training`, `fraud-detection-inference`
   - Set up build configuration for Lambda deployment packages
-  - **Git commit and push**: "Set up project structure and dependencies"
+  - **Git commit and push**: "feat: set up fraud detection ML pipeline project structure
+    
+    - Created Gradle multi-module project with fraud-detection-common, fraud-detection-training, and fraud-detection-inference modules
+    - Added CEAP platform as Git submodule at ceap-platform/
+    - Configured AWS SDK v2, Kotlin, Jackson, and Kotest dependencies
+    - Set up build configuration for Lambda deployment packages with fat JAR assembly"
   - _Requirements: 1.1, 1.2, 10.1_
 
 - [ ] 2. Implement core data models
@@ -43,7 +48,14 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 2.1, 10.4_
   
   - [x] 2.4 Git commit and push
-    - **Git commit and push**: "Implement core data models"
+    - **Git commit and push**: "feat: implement core data models for fraud detection pipeline
+    
+    - Created Transaction data class with id, timestamp, amount, merchantCategory, and features map
+    - Created ScoredTransaction extending Transaction with fraudScore and scoringTimestamp
+    - Implemented ExecutionContext for workflow state management with executionId, stage tracking, and S3 bucket configuration
+    - Implemented StageResult for stage output with status, recordsProcessed, and error handling
+    - Added Jackson annotations for JSON serialization/deserialization
+    - Included property tests validating fraud score range constraints"
 
 
 - [ ] 3. Implement WorkflowLambdaHandler base class
@@ -76,11 +88,24 @@ When completing "Git commit and push" tasks, commits should include:
     - **Validates: Requirements 10.4, 15.1**
   
   - [x] 3.6 Git commit and push
-    - **Git commit and push**: "Implement WorkflowLambdaHandler base class"
+    - **Git commit and push**: "feat: implement WorkflowLambdaHandler base class for S3 orchestration
+    
+    - Created abstract WorkflowLambdaHandler implementing AWS Lambda RequestHandler interface
+    - Implemented convention-based S3 input reading with support for first stage (initialData) and subsequent stages (S3 paths)
+    - Implemented convention-based S3 output writing with standardized path structure (s3://bucket/execId/stage/output.json)
+    - Added comprehensive error handling for S3 operations (403, 404, 503, 500 errors)
+    - Integrated S3Client and ObjectMapper for AWS operations and JSON processing
+    - Added detailed logging for all S3 operations and error conditions
+    - Included property tests validating S3 path conventions and error handling behavior"
 
 - [x] 4. Checkpoint - Ensure base handler tests pass
   - Ensure all tests pass, ask the user if questions arise.
-  - **Git commit and push**: "Checkpoint: Base handler tests passing"
+  - **Git commit and push**: "chore: checkpoint - base handler tests passing
+    
+    - Verified all WorkflowLambdaHandler property tests pass
+    - Confirmed S3 orchestration conventions work correctly
+    - Validated error handling behavior meets requirements
+    - Ensured foundation is solid before building pipeline handlers"
 
 
 - [ ] 5. Implement Glue data preparation script
@@ -101,7 +126,15 @@ When completing "Git commit and push" tasks, commits should include:
     - **Validates: Requirements 2.4**
   
   - [x] 5.4 Git commit and push
-    - **Git commit and push**: "Implement Glue data preparation script"
+    - **Git commit and push**: "feat: implement Glue data preparation script for ML training
+    
+    - Created PySpark data-prep.py script using AWS Glue framework
+    - Implemented dataset loading from S3 with configurable input paths
+    - Implemented 70/15/15 train/validation/test split with stratification
+    - Added data quality validation checks (null values, feature completeness, label distribution)
+    - Implemented Parquet output format compatible with SageMaker XGBoost
+    - Added comprehensive logging for data statistics and quality metrics
+    - Included property tests validating split proportions and SageMaker output format"
 
 - [ ] 6. Implement TrainHandler
   - [x] 6.1 Create TrainHandler extending WorkflowLambdaHandler
@@ -119,7 +152,16 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 3.2, 3.3_
   
   - [x] 6.3 Git commit and push
-    - **Git commit and push**: "Implement TrainHandler"
+    - **Git commit and push**: "feat: implement TrainHandler for SageMaker model training
+    
+    - Created TrainHandler extending WorkflowLambdaHandler for training workflow stage
+    - Integrated SageMaker client for training job management
+    - Configured XGBoost algorithm with hyperparameters (max_depth=5, eta=0.2, objective=binary:logistic)
+    - Implemented training job creation with S3 input/output paths from workflow context
+    - Added training job status polling with configurable wait logic
+    - Implemented error handling for training failures with detailed error messages
+    - Returned training job metadata including model artifact location
+    - Included unit tests with mocked SageMaker client validating job configuration and error handling"
 
 
 - [x] 7. Implement EvaluateHandler
@@ -139,10 +181,19 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 3.6_
   
   - [x] 7.3 Git commit and push
-    - **Git commit and push**: "Implement EvaluateHandler"
+    - **Git commit and push**: "feat: implement EvaluateHandler for model evaluation
+    
+    - Created EvaluateHandler extending WorkflowLambdaHandler for evaluation workflow stage
+    - Implemented temporary SageMaker endpoint creation for model evaluation
+    - Loaded test dataset from S3 and executed batch predictions
+    - Calculated comprehensive metrics: accuracy, precision, recall, F1 score, and AUC
+    - Implemented accuracy threshold validation (>= 0.90) with failure handling
+    - Added automatic cleanup of temporary evaluation endpoint
+    - Implemented error handling for endpoint creation and prediction failures
+    - Included unit tests validating metrics calculation and threshold enforcement"
 
-- [ ] 8. Implement DeployHandler
-  - [ ] 8.1 Create DeployHandler extending WorkflowLambdaHandler
+- [-] 8. Implement DeployHandler
+  - [x] 8.1 Create DeployHandler extending WorkflowLambdaHandler
     - Implement processData method
     - Create SageMaker model from artifact
     - Create endpoint configuration
@@ -151,18 +202,32 @@ When completing "Git commit and push" tasks, commits should include:
     - Write endpoint metadata to config bucket
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   
-  - [ ] 8.2 Write unit tests for DeployHandler
+  - [x] 8.2 Write unit tests for DeployHandler
     - Test endpoint creation with mocked SageMaker client
     - Test endpoint update for existing endpoints
     - Test health check validation
     - _Requirements: 4.2, 4.3, 4.4_
   
-  - [ ] 8.3 Git commit and push
-    - **Git commit and push**: "Implement DeployHandler"
+  - [x] 8.3 Git commit and push
+    - **Git commit and push**: "feat: implement DeployHandler for production model deployment
+    
+    - Created DeployHandler extending WorkflowLambdaHandler for deployment workflow stage
+    - Implemented SageMaker model creation from training artifact
+    - Created endpoint configuration with instance type and count specifications
+    - Implemented endpoint creation for new deployments and updates for existing endpoints
+    - Added endpoint health check with test transaction validation
+    - Wrote endpoint metadata (name, ARN, timestamp) to config bucket for inference pipeline
+    - Implemented error handling for deployment failures and rollback scenarios
+    - Included unit tests validating endpoint creation, updates, and health checks"
 
-- [ ] 9. Checkpoint - Ensure training pipeline handlers pass tests
+- [x] 9. Checkpoint - Ensure training pipeline handlers pass tests
   - Ensure all tests pass, ask the user if questions arise.
-  - **Git commit and push**: "Checkpoint: Training pipeline handlers complete"
+  - **Git commit and push**: "chore: checkpoint - training pipeline handlers complete
+    
+    - Verified all training pipeline handler tests pass (TrainHandler, EvaluateHandler, DeployHandler)
+    - Confirmed SageMaker integration works correctly for training, evaluation, and deployment
+    - Validated end-to-end training workflow from data prep through model deployment
+    - Ensured training pipeline is ready for infrastructure deployment"
 
 
 - [ ] 10. Implement ScoreHandler
@@ -185,7 +250,16 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 6.1, 6.2, 6.3_
   
   - [ ] 10.4 Git commit and push
-    - **Git commit and push**: "Implement ScoreHandler"
+    - **Git commit and push**: "feat: implement ScoreHandler for real-time fraud scoring
+    
+    - Created ScoreHandler extending WorkflowLambdaHandler for scoring workflow stage
+    - Implemented endpoint name retrieval from config bucket (written by DeployHandler)
+    - Loaded transaction batches from S3 with configurable batch sizes
+    - Integrated SageMaker Runtime client for real-time endpoint invocation
+    - Implemented per-transaction scoring with feature vector transformation
+    - Created ScoredTransaction objects with fraud scores and timestamps
+    - Added error handling for endpoint invocation failures and retries
+    - Included property tests validating endpoint invocation behavior and unit tests for batch processing"
 
 - [ ] 11. Implement StoreHandler
   - [ ] 11.1 Create StoreHandler extending WorkflowLambdaHandler
@@ -206,7 +280,16 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 7.2, 7.3, 7.5_
   
   - [ ] 11.4 Git commit and push
-    - **Git commit and push**: "Implement StoreHandler"
+    - **Git commit and push**: "feat: implement StoreHandler for DynamoDB persistence
+    
+    - Created StoreHandler extending WorkflowLambdaHandler for storage workflow stage
+    - Implemented DynamoDB batch write logic with 25-item batch limit
+    - Added unprocessed items retry logic with exponential backoff
+    - Tracked error count and failed items for monitoring
+    - Calculated summary statistics: risk distribution (high/medium/low), average fraud score, total transactions
+    - Implemented error handling for DynamoDB throttling and service errors
+    - Added comprehensive logging for batch operations and retry attempts
+    - Included property tests validating write completeness and unit tests for batch processing and statistics"
 
 
 - [ ] 12. Implement AlertHandler
@@ -237,7 +320,16 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 8.2, 8.3, 8.4_
   
   - [ ] 12.6 Git commit and push
-    - **Git commit and push**: "Implement AlertHandler"
+    - **Git commit and push**: "feat: implement AlertHandler for high-risk transaction alerts
+    
+    - Created AlertHandler extending WorkflowLambdaHandler for alerting workflow stage
+    - Implemented high-risk transaction filtering (fraud score >= 0.8)
+    - Added alert batching logic with 100 transactions per SNS message limit
+    - Built structured alert messages with transaction details (id, amount, score, timestamp, merchant)
+    - Integrated SNS client for alert publishing to configured topic
+    - Implemented error handling for SNS publish failures with retry logic
+    - Added alert statistics tracking (total high-risk, batches sent)
+    - Included property tests validating high-risk identification, batching, and message completeness"
 
 - [ ] 13. Implement MonitorHandler
   - [ ] 13.1 Create MonitorHandler extending WorkflowLambdaHandler
@@ -264,11 +356,25 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 14.1, 14.2, 14.3, 14.4_
   
   - [ ] 13.5 Git commit and push
-    - **Git commit and push**: "Implement MonitorHandler"
+    - **Git commit and push**: "feat: implement MonitorHandler for distribution drift detection
+    
+    - Created MonitorHandler extending WorkflowLambdaHandler for monitoring workflow stage
+    - Implemented historical baseline loading from S3 metrics with fallback for first run
+    - Calculated distribution metrics: high/medium/low risk percentages and average fraud score
+    - Implemented drift detection logic (avg score drift > 0.1 OR high risk % drift > 0.05)
+    - Integrated SNS client for monitoring alerts when drift detected
+    - Wrote current metrics to S3 for historical tracking and baseline updates
+    - Added comprehensive logging for drift analysis and alert triggers
+    - Included property tests validating drift detection thresholds and metrics persistence"
 
 - [ ] 14. Checkpoint - Ensure inference pipeline handlers pass tests
   - Ensure all tests pass, ask the user if questions arise.
-  - **Git commit and push**: "Checkpoint: Inference pipeline handlers complete"
+  - **Git commit and push**: "chore: checkpoint - inference pipeline handlers complete
+    
+    - Verified all inference pipeline handler tests pass (ScoreHandler, StoreHandler, AlertHandler, MonitorHandler)
+    - Confirmed SageMaker Runtime, DynamoDB, and SNS integrations work correctly
+    - Validated end-to-end inference workflow from scoring through monitoring
+    - Ensured inference pipeline is ready for infrastructure deployment"
 
 
 - [ ] 15. Create CDK infrastructure stacks
@@ -296,7 +402,19 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 12.1, 12.2_
   
   - [ ] 15.4 Git commit and push
-    - **Git commit and push**: "Create CDK infrastructure stacks"
+    - **Git commit and push**: "feat: create CDK infrastructure stacks for both pipelines
+    
+    - Created TrainingPipelineStack with Standard workflow (DataPrep, Train, Evaluate, Deploy stages)
+    - Configured Glue job with data-prep.py script and appropriate IAM permissions
+    - Created Lambda functions for Train, Evaluate, Deploy handlers with SageMaker permissions
+    - Set up S3 buckets for workflow orchestration, data storage, model artifacts, and config
+    - Added EventBridge schedule for weekly training execution
+    - Created InferencePipelineStack with Express workflow (Score, Store, Alert, Monitor stages)
+    - Configured Lambda functions for all inference handlers with appropriate permissions
+    - Set up DynamoDB table with GSI for transaction queries
+    - Configured SNS topics for alerts and monitoring notifications
+    - Added EventBridge schedule for daily inference execution
+    - Included unit tests validating stack synthesis and resource creation"
 
 - [ ] 16. Create deployment scripts
   - [ ] 16.1 Create deploy-training-pipeline.sh script
@@ -313,7 +431,13 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 1.5, 12.5_
   
   - [ ] 16.3 Git commit and push
-    - **Git commit and push**: "Create deployment scripts"
+    - **Git commit and push**: "feat: create deployment scripts for pipeline automation
+    
+    - Created deploy-training-pipeline.sh script with Gradle build, Lambda packaging, Glue script upload, and CDK deployment
+    - Created deploy-inference-pipeline.sh script with Gradle build, Lambda packaging, and CDK deployment
+    - Added error handling and validation checks in deployment scripts
+    - Included environment variable configuration for AWS region and account
+    - Added deployment status reporting and rollback instructions"
 
 
 - [ ] 17. Create integration tests
@@ -330,7 +454,16 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 16.2, 16.3_
   
   - [ ] 17.3 Git commit and push
-    - **Git commit and push**: "Create integration tests"
+    - **Git commit and push**: "test: create integration tests for end-to-end workflows
+    
+    - Created TrainingPipelineIntegrationTest validating complete training workflow
+    - Tested S3 orchestration between DataPrep, Train, Evaluate, and Deploy stages
+    - Validated error handling and retry logic for training pipeline
+    - Created InferencePipelineIntegrationTest validating complete inference workflow
+    - Tested S3 orchestration between Score, Store, Alert, and Monitor stages
+    - Validated DynamoDB storage, SNS alerting, and drift detection
+    - Used mocked AWS services for reliable test execution
+    - Added assertions for workflow state transitions and data flow"
 
 - [ ] 18. Create documentation
   - [ ] 18.1 Create README.md
@@ -353,11 +486,27 @@ When completing "Git commit and push" tasks, commits should include:
     - _Requirements: 17.3_
   
   - [ ] 18.4 Git commit and push
-    - **Git commit and push**: "Create documentation"
+    - **Git commit and push**: "docs: create comprehensive project documentation
+    
+    - Created README.md with system architecture overview and component diagrams
+    - Added detailed setup instructions including prerequisites and dependency installation
+    - Included deployment guide for both training and inference pipelines
+    - Documented monitoring and troubleshooting procedures
+    - Added inline code comments explaining CEAP integration patterns
+    - Documented S3 orchestration conventions and path structures
+    - Explained SageMaker integration patterns for training and inference
+    - Created example configuration files for workflows, Lambda handlers, and Glue jobs
+    - Added operational runbooks for common scenarios"
 
 - [ ] 19. Final checkpoint - Ensure all tests pass and documentation is complete
   - Ensure all tests pass, ask the user if questions arise.
-  - **Git commit and push**: "Final checkpoint: Project complete"
+  - **Git commit and push**: "chore: final checkpoint - fraud detection ML pipeline complete
+    
+    - Verified all unit tests, property tests, and integration tests pass
+    - Confirmed all handlers implement required functionality correctly
+    - Validated CDK infrastructure stacks synthesize without errors
+    - Ensured documentation is complete and accurate
+    - Project ready for deployment to AWS environment"
 
 ## Notes
 
