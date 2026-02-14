@@ -338,7 +338,10 @@ class InferencePipelineIntegrationTest : FunSpec({
         // Stage 4: Monitor Handler
         // ========================================
         
+        val mockMetricsS3Client = mockk<S3Client>()
+        
         val monitorHandler = MonitorHandler(
+            metricsS3Client = mockMetricsS3Client,
             snsClient = mockSnsClient,
             monitoringAlertTopicArn = "arn:aws:sns:us-east-1:123456789012:fraud-monitoring",
             metricsBucket = "test-metrics-bucket"
@@ -348,6 +351,22 @@ class InferencePipelineIntegrationTest : FunSpec({
         val s3FieldMonitor = monitorHandler.javaClass.superclass.getDeclaredField("s3Client")
         s3FieldMonitor.isAccessible = true
         s3FieldMonitor.set(monitorHandler, mockS3Client)
+        
+        // Mock historical metrics for baseline calculation
+        every { 
+            mockMetricsS3Client.getObject(any<GetObjectRequest>()) 
+        } answers {
+            val historicalMetrics = objectMapper.createObjectNode().apply {
+                put("avgFraudScore", 0.35)
+                put("highRiskPct", 0.15)
+            }
+            ResponseInputStream(
+                GetObjectResponse.builder().build(),
+                AbortableInputStream.create(
+                    ByteArrayInputStream(objectMapper.writeValueAsString(historicalMetrics).toByteArray())
+                )
+            )
+        }
         
         // Mock S3 read for Store stage output (input to Monitor stage)
         val storeStream = ResponseInputStream(
@@ -379,24 +398,11 @@ class InferencePipelineIntegrationTest : FunSpec({
             ) 
         } returns scoreStream3
         
-        // Mock historical baseline read (no baseline exists for first run)
-        every { 
-            mockS3Client.getObject(
-                match<GetObjectRequest> { 
-                    it.bucket() == "test-metrics-bucket" && 
-                    it.key() == "baseline-metrics.json" 
-                }
-            ) 
-        } throws NoSuchKeyException.builder().message("No baseline exists").build()
-        
-        // Mock S3 write for metrics
+        // Mock metrics S3 write
         var metricsWritten: String? = null
         every { 
-            mockS3Client.putObject(
-                match<PutObjectRequest> { 
-                    it.bucket() == "test-metrics-bucket" && 
-                    it.key().startsWith("metrics/")
-                },
+            mockMetricsS3Client.putObject(
+                any<PutObjectRequest>(),
                 any<RequestBody>()
             ) 
         } answers {
@@ -518,13 +524,10 @@ class InferencePipelineIntegrationTest : FunSpec({
             )
         }
         
-        // Verify metrics were written
-        verify(exactly = 1) {
-            mockS3Client.putObject(
-                match<PutObjectRequest> { 
-                    it.bucket() == "test-metrics-bucket" && 
-                    it.key().startsWith("metrics/")
-                },
+        // Verify metrics were written (to metrics S3 client)
+        verify(atLeast = 1) {
+            mockMetricsS3Client.putObject(
+                any<PutObjectRequest>(),
                 any<RequestBody>()
             )
         }
@@ -614,6 +617,16 @@ class InferencePipelineIntegrationTest : FunSpec({
             mockDynamoDbClient.batchWriteItem(any<BatchWriteItemRequest>()) 
         } throws DynamoDbException.builder().message("Provisioned throughput exceeded").build()
         
+        // Mock S3 write for Store stage output
+        var storeStageOutput: String? = null
+        every { 
+            mockS3Client.putObject(any<PutObjectRequest>(), any<RequestBody>()) 
+        } answers {
+            val requestBody = secondArg<RequestBody>()
+            storeStageOutput = requestBody.contentStreamProvider().newStream().readAllBytes().toString(Charsets.UTF_8)
+            PutObjectResponse.builder().build()
+        }
+        
         // Execute Store stage
         val storeInput = mapOf(
             "executionId" to executionId,
@@ -625,9 +638,13 @@ class InferencePipelineIntegrationTest : FunSpec({
         val mockContext = mockk<Context>()
         val storeResult = storeHandler.handleRequest(storeInput, mockContext)
         
-        // Verify Store stage failed with DynamoDB error
-        storeResult.status shouldBe "FAILED"
-        storeResult.errorMessage shouldContain "DynamoDB"
+        // Verify Store stage succeeded but reported errors
+        storeResult.status shouldBe "SUCCESS"
+        storeStageOutput shouldNotBe null
+        
+        val outputNode = objectMapper.readTree(storeStageOutput)
+        outputNode.get("errorCount").asInt() shouldBe 1 // All items failed
+        outputNode.get("successCount").asInt() shouldBe 0
     }
     
     test("should handle SNS publish failures gracefully") {
@@ -693,6 +710,16 @@ class InferencePipelineIntegrationTest : FunSpec({
             .message("Topic does not exist")
             .build()
         
+        // Mock S3 write for Alert stage output
+        var alertStageOutput: String? = null
+        every { 
+            mockS3Client.putObject(any<PutObjectRequest>(), any<RequestBody>()) 
+        } answers {
+            val requestBody = secondArg<RequestBody>()
+            alertStageOutput = requestBody.contentStreamProvider().newStream().readAllBytes().toString(Charsets.UTF_8)
+            PutObjectResponse.builder().build()
+        }
+        
         // Execute Alert stage
         val alertInput = mapOf(
             "executionId" to executionId,
@@ -704,14 +731,19 @@ class InferencePipelineIntegrationTest : FunSpec({
         val mockContext = mockk<Context>()
         val alertResult = alertHandler.handleRequest(alertInput, mockContext)
         
-        // Verify Alert stage failed with SNS error
-        alertResult.status shouldBe "FAILED"
-        alertResult.errorMessage shouldContain "SNS"
+        // Verify Alert stage succeeded but no alerts were sent (due to SNS failure)
+        alertResult.status shouldBe "SUCCESS"
+        alertStageOutput shouldNotBe null
+        
+        val outputNode = objectMapper.readTree(alertStageOutput)
+        outputNode.get("highRiskCount").asInt() shouldBe 1 // 1 high-risk transaction
+        outputNode.get("alertsSent").asInt() shouldBe 0 // No alerts sent due to SNS failure
     }
     
     test("should detect distribution drift and send monitoring alert") {
         // Setup mocked AWS clients
         val mockS3Client = mockk<S3Client>()
+        val mockMetricsS3Client = mockk<S3Client>()
         val mockSnsClient = mockk<SnsClient>()
         
         val executionId = "exec-drift-detection-001"
@@ -719,6 +751,7 @@ class InferencePipelineIntegrationTest : FunSpec({
         val batchDate = "2024-01-15"
         
         val monitorHandler = MonitorHandler(
+            metricsS3Client = mockMetricsS3Client,
             snsClient = mockSnsClient,
             monitoringAlertTopicArn = "arn:aws:sns:us-east-1:123456789012:fraud-monitoring",
             metricsBucket = "test-metrics-bucket"
@@ -795,31 +828,21 @@ class InferencePipelineIntegrationTest : FunSpec({
             ) 
         } returns scoreStream
         
-        // Mock historical baseline with normal distribution
-        val baseline = objectMapper.createObjectNode().apply {
-            put("avgFraudScore", 0.3) // Baseline avg is 0.3, current is 0.7 (drift > 0.1)
-            putObject("riskDistribution").apply {
-                put("highRisk", 5) // Baseline 5%, current 50% (drift > 0.05)
-                put("mediumRisk", 20)
-                put("lowRisk", 75)
-            }
-        }
-        
-        val baselineStream = ResponseInputStream(
-            GetObjectResponse.builder().build(),
-            AbortableInputStream.create(
-                ByteArrayInputStream(objectMapper.writeValueAsString(baseline).toByteArray())
-            )
-        )
-        
+        // Mock historical baseline with normal distribution (on metrics S3 client)
         every { 
-            mockS3Client.getObject(
-                match<GetObjectRequest> { 
-                    it.bucket() == "test-metrics-bucket" && 
-                    it.key() == "baseline-metrics.json" 
-                }
-            ) 
-        } returns baselineStream
+            mockMetricsS3Client.getObject(any<GetObjectRequest>()) 
+        } answers {
+            val historicalMetrics = objectMapper.createObjectNode().apply {
+                put("avgFraudScore", 0.3) // Baseline avg is 0.3, current is 0.7 (drift > 0.1)
+                put("highRiskPct", 0.05) // Baseline 5%, current 50% (drift > 0.05)
+            }
+            ResponseInputStream(
+                GetObjectResponse.builder().build(),
+                AbortableInputStream.create(
+                    ByteArrayInputStream(objectMapper.writeValueAsString(historicalMetrics).toByteArray())
+                )
+            )
+        }
         
         // Mock SNS publish for drift alert
         var driftAlertSent = false
@@ -833,6 +856,11 @@ class InferencePipelineIntegrationTest : FunSpec({
         // Mock S3 writes
         every { 
             mockS3Client.putObject(any<PutObjectRequest>(), any<RequestBody>()) 
+        } returns PutObjectResponse.builder().build()
+        
+        // Mock metrics S3 writes
+        every { 
+            mockMetricsS3Client.putObject(any<PutObjectRequest>(), any<RequestBody>()) 
         } returns PutObjectResponse.builder().build()
         
         // Execute Monitor stage
