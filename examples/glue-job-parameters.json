@@ -1,0 +1,58 @@
+{
+  "comment": "Example parameters for the Glue data preparation job",
+  "description": "These parameters are passed to the Glue job when it is invoked by the training pipeline",
+  
+  "job-name": "fraud-detection-data-prep",
+  
+  "arguments": {
+    "--dataset_s3_path": "s3://fraud-detection-data/kaggle-credit-card-fraud.csv",
+    "--output_prefix": "s3://fraud-detection-data/prepared/",
+    "--train_split": "0.70",
+    "--validation_split": "0.15",
+    "--test_split": "0.15",
+    "--enable-metrics": "true",
+    "--enable-continuous-cloudwatch-log": "true",
+    "--enable-spark-ui": "true",
+    "--spark-event-logs-path": "s3://fraud-detection-glue-logs/spark-logs/",
+    "--job-bookmark-option": "job-bookmark-disable",
+    "--TempDir": "s3://fraud-detection-glue-temp/"
+  },
+  
+  "parameter_descriptions": {
+    "--dataset_s3_path": "S3 path to the input dataset (Kaggle Credit Card Fraud Detection CSV)",
+    "--output_prefix": "S3 prefix where prepared datasets will be written",
+    "--train_split": "Proportion of data for training (0.70 = 70%)",
+    "--validation_split": "Proportion of data for validation (0.15 = 15%)",
+    "--test_split": "Proportion of data for testing (0.15 = 15%)",
+    "--enable-metrics": "Enable CloudWatch metrics for the Glue job",
+    "--enable-continuous-cloudwatch-log": "Enable continuous logging to CloudWatch",
+    "--enable-spark-ui": "Enable Spark UI for debugging",
+    "--spark-event-logs-path": "S3 path for Spark event logs",
+    "--job-bookmark-option": "Disable job bookmarks (process all data each time)",
+    "--TempDir": "S3 path for temporary files during Glue job execution"
+  },
+  
+  "glue_configuration": {
+    "GlueVersion": "4.0",
+    "WorkerType": "G.1X",
+    "NumberOfWorkers": 5,
+    "MaxRetries": 0,
+    "Timeout": 30,
+    "MaxConcurrentRuns": 1,
+    "description": {
+      "GlueVersion": "Glue version (4.0 supports Python 3.10 and Spark 3.3)",
+      "WorkerType": "Worker type (G.1X = 1 DPU, 4 vCPU, 16 GB memory)",
+      "NumberOfWorkers": "Number of workers (5 DPUs total for ~300K records)",
+      "MaxRetries": "Number of retries on failure (0 = no retries)",
+      "Timeout": "Job timeout in minutes (30 minutes)",
+      "MaxConcurrentRuns": "Maximum concurrent job runs (1 = sequential execution)"
+    }
+  },
+  
+  "notes": {
+    "invocation": "The Glue job is invoked by the training pipeline Step Functions workflow",
+    "output_format": "Outputs are written in Parquet format for efficient SageMaker training",
+    "data_quality": "The job validates data quality (null values, feature completeness, label distribution)",
+    "scaling": "For larger datasets, increase NumberOfWorkers proportionally"
+  }
+}

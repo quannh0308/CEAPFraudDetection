@@ -1,0 +1,16 @@
+{
+  "comment": "Example endpoint metadata written by DeployHandler",
+  "description": "This file is written to s3://fraud-detection-config/current-endpoint.json by DeployHandler and read by ScoreHandler",
+  
+  "endpointName": "fraud-detection-prod",
+  "modelName": "fraud-detection-prod-1705334400000",
+  "deploymentTimestamp": 1705334400000,
+  
+  "notes": {
+    "endpointName": "Fixed name for the production endpoint (fraud-detection-prod). ScoreHandler reads this to know which endpoint to invoke.",
+    "modelName": "Unique model name including timestamp. Each training run creates a new model.",
+    "deploymentTimestamp": "Unix timestamp (milliseconds) when the model was deployed",
+    "usage": "ScoreHandler reads this file at the start of each inference pipeline execution to get the current endpoint name",
+    "updates": "This file is updated by DeployHandler each time a new model is deployed (weekly training pipeline)"
+  }
+}

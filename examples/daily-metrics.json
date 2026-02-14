@@ -1,0 +1,26 @@
+{
+  "comment": "Example daily metrics written by MonitorHandler",
+  "description": "This file is written to s3://fraud-detection-metrics/metrics/{batchDate}.json by MonitorHandler for historical tracking",
+  
+  "batchDate": "2024-01-15",
+  "avgFraudScore": 0.4573,
+  "highRiskPct": 0.05,
+  "mediumRiskPct": 0.15,
+  "lowRiskPct": 0.80,
+  "avgScoreDrift": 0.0234,
+  "highRiskDrift": 0.0123,
+  "driftDetected": false,
+  
+  "notes": {
+    "batchDate": "Date of the transaction batch (YYYY-MM-DD format)",
+    "avgFraudScore": "Average fraud score across all transactions in the batch (0.0 to 1.0)",
+    "highRiskPct": "Percentage of transactions with fraud score >= 0.8",
+    "mediumRiskPct": "Percentage of transactions with fraud score >= 0.5 and < 0.8",
+    "lowRiskPct": "Percentage of transactions with fraud score < 0.5",
+    "avgScoreDrift": "Absolute difference between current avgFraudScore and 30-day baseline",
+    "highRiskDrift": "Absolute difference between current highRiskPct and 30-day baseline",
+    "driftDetected": "true if avgScoreDrift > 0.1 OR highRiskDrift > 0.05, indicating model drift",
+    "usage": "MonitorHandler loads the last 30 days of these files to calculate baseline metrics",
+    "alerting": "If driftDetected is true, an SNS alert is sent to the monitoring topic"
+  }
+}

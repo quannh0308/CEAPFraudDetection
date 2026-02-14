@@ -1,0 +1,47 @@
+{
+  "comment": "Example environment variables for Lambda handlers",
+  "description": "These environment variables should be configured in the Lambda function settings or CDK stack",
+  
+  "TrainHandler": {
+    "SAGEMAKER_EXECUTION_ROLE_ARN": "arn:aws:iam::123456789012:role/SageMakerExecutionRole",
+    "description": "IAM role ARN that SageMaker will assume for training jobs. Must have permissions to read from S3 data bucket and write to S3 models bucket."
+  },
+  
+  "EvaluateHandler": {
+    "SAGEMAKER_EXECUTION_ROLE_ARN": "arn:aws:iam::123456789012:role/SageMakerExecutionRole",
+    "description": "IAM role ARN that SageMaker will assume for creating temporary evaluation endpoints."
+  },
+  
+  "DeployHandler": {
+    "SAGEMAKER_EXECUTION_ROLE_ARN": "arn:aws:iam::123456789012:role/SageMakerExecutionRole",
+    "CONFIG_BUCKET": "fraud-detection-config",
+    "description": "IAM role ARN for SageMaker endpoints. CONFIG_BUCKET is where endpoint metadata is written for the inference pipeline."
+  },
+  
+  "ScoreHandler": {
+    "CONFIG_BUCKET": "fraud-detection-config",
+    "description": "S3 bucket where current endpoint metadata is stored (written by DeployHandler)."
+  },
+  
+  "StoreHandler": {
+    "DYNAMODB_TABLE_NAME": "FraudScores",
+    "description": "DynamoDB table name for storing scored transactions."
+  },
+  
+  "AlertHandler": {
+    "FRAUD_ALERT_TOPIC_ARN": "arn:aws:sns:us-east-1:123456789012:fraud-detection-alerts",
+    "description": "SNS topic ARN for publishing high-risk transaction alerts."
+  },
+  
+  "MonitorHandler": {
+    "MONITORING_ALERT_TOPIC_ARN": "arn:aws:sns:us-east-1:123456789012:fraud-detection-monitoring",
+    "METRICS_BUCKET": "fraud-detection-metrics",
+    "description": "SNS topic ARN for drift detection alerts. METRICS_BUCKET is where daily performance metrics are stored."
+  },
+  
+  "notes": {
+    "deployment": "These environment variables are automatically configured by the CDK stacks during deployment",
+    "local_testing": "For local testing, set these as environment variables or pass them to handler constructors",
+    "security": "Never commit actual ARNs or sensitive values to version control. Use AWS Secrets Manager or Parameter Store for production."
+  }
+}
