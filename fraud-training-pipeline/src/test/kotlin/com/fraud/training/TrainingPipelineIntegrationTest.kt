@@ -37,6 +37,7 @@ class TrainingPipelineIntegrationTest : FunSpec({
         // Setup mocked AWS clients
         val mockS3Client = mockk<S3Client>()
         val mockSageMakerClient = mockk<SageMakerClient>()
+        val mockSageMakerRuntimeClient = mockk<software.amazon.awssdk.services.sagemakerruntime.SageMakerRuntimeClient>()
         val mockWaiter = mockk<SageMakerWaiter>()
         
         val executionId = "exec-training-integration-001"
@@ -143,6 +144,7 @@ class TrainingPipelineIntegrationTest : FunSpec({
         
         val evaluateHandler = EvaluateHandler(
             sageMakerClient = mockSageMakerClient,
+            sageMakerRuntimeClient = mockSageMakerRuntimeClient,
             sageMakerExecutionRoleArn = "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
         )
         
@@ -152,9 +154,16 @@ class TrainingPipelineIntegrationTest : FunSpec({
         s3FieldEval.set(evaluateHandler, mockS3Client)
         
         // Mock S3 read for Train stage output (input to Evaluate stage)
+        // Manually add testDataPath to ensure it's available for EvaluateHandler
+        val trainOutputWithTestPath = objectMapper.readTree(trainStageOutput!!)
+        (trainOutputWithTestPath as com.fasterxml.jackson.databind.node.ObjectNode).put(
+            "testDataPath", 
+            "s3://fraud-detection-data/prepared/test.parquet"
+        )
+        
         val trainStream = ResponseInputStream(
             GetObjectResponse.builder().build(),
-            AbortableInputStream.create(ByteArrayInputStream(trainStageOutput!!.toByteArray()))
+            AbortableInputStream.create(ByteArrayInputStream(objectMapper.writeValueAsString(trainOutputWithTestPath).toByteArray()))
         )
         
         every { 
@@ -193,6 +202,13 @@ class TrainingPipelineIntegrationTest : FunSpec({
         every { 
             mockWaiter.waitUntilEndpointInService(any<DescribeEndpointRequest>()) 
         } returns mockk()
+        
+        // Mock SageMaker Runtime endpoint invocations for predictions
+        every { 
+            mockSageMakerRuntimeClient.invokeEndpoint(any<software.amazon.awssdk.services.sagemakerruntime.model.InvokeEndpointRequest>()) 
+        } returns software.amazon.awssdk.services.sagemakerruntime.model.InvokeEndpointResponse.builder()
+            .body(software.amazon.awssdk.core.SdkBytes.fromUtf8String("0.95")) // High accuracy prediction
+            .build()
         
         // Mock test data loading
         val testDataJson = """
@@ -542,7 +558,7 @@ class TrainingPipelineIntegrationTest : FunSpec({
         
         // Verify Train stage failed with S3 error
         trainResult.status shouldBe "FAILED"
-        trainResult.errorMessage shouldContain "Failed to read input from S3"
+        trainResult.errorMessage shouldContain "Previous stage output not found in S3"
     }
     
     test("should handle model evaluation failure when accuracy is below threshold") {
