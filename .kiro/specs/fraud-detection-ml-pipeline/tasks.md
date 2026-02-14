@@ -377,8 +377,8 @@ When completing "Git commit and push" tasks, commits should include:
     - Ensured inference pipeline is ready for infrastructure deployment"
 
 
-- [~] 15. Create CDK infrastructure stacks
-  - [ ] 15.1 Create TrainingPipelineStack
+- [x] 15. Create CDK infrastructure stacks
+  - [x] 15.1 Create TrainingPipelineStack
     - Define Standard workflow with 4 stages: DataPrep (Glue), Train, Evaluate, Deploy
     - Configure Glue job with data-prep.py script
     - Configure Lambda functions for Train, Evaluate, Deploy handlers
@@ -387,7 +387,7 @@ When completing "Git commit and push" tasks, commits should include:
     - Add EventBridge schedule for weekly execution
     - _Requirements: 1.5, 5.1, 5.2, 12.1, 12.2_
   
-  - [ ] 15.2 Create InferencePipelineStack
+  - [x] 15.2 Create InferencePipelineStack
     - Define Express workflow with 4 stages: Score, Store, Alert, Monitor
     - Configure Lambda functions for all handlers
     - Set up DynamoDB table with GSI
@@ -396,12 +396,12 @@ When completing "Git commit and push" tasks, commits should include:
     - Add EventBridge schedule for daily execution
     - _Requirements: 1.5, 9.1, 9.2, 12.1, 12.2, 12.3_
   
-  - [ ] 15.3 Write unit tests for CDK stacks
+  - [x] 15.3 Write unit tests for CDK stacks
     - Test stack synthesis
     - Verify resource creation
     - _Requirements: 12.1, 12.2_
   
-  - [ ] 15.4 Git commit and push
+  - [x] 15.4 Git commit and push
     - **Git commit and push**: "feat: create CDK infrastructure stacks for both pipelines
     
     - Created TrainingPipelineStack with Standard workflow (DataPrep, Train, Evaluate, Deploy stages)
@@ -416,21 +416,21 @@ When completing "Git commit and push" tasks, commits should include:
     - Added EventBridge schedule for daily inference execution
     - Included unit tests validating stack synthesis and resource creation"
 
-- [ ] 16. Create deployment scripts
-  - [ ] 16.1 Create deploy-training-pipeline.sh script
+- [x] 16. Create deployment scripts
+  - [x] 16.1 Create deploy-training-pipeline.sh script
     - Build Gradle project
     - Package Lambda functions
     - Upload Glue script to S3
     - Deploy CDK stack
     - _Requirements: 1.5, 12.5_
   
-  - [ ] 16.2 Create deploy-inference-pipeline.sh script
+  - [x] 16.2 Create deploy-inference-pipeline.sh script
     - Build Gradle project
     - Package Lambda functions
     - Deploy CDK stack
     - _Requirements: 1.5, 12.5_
   
-  - [ ] 16.3 Git commit and push
+  - [x] 16.3 Git commit and push
     - **Git commit and push**: "feat: create deployment scripts for pipeline automation
     
     - Created deploy-training-pipeline.sh script with Gradle build, Lambda packaging, Glue script upload, and CDK deployment
@@ -440,20 +440,20 @@ When completing "Git commit and push" tasks, commits should include:
     - Added deployment status reporting and rollback instructions"
 
 
-- [ ] 17. Create integration tests
-  - [ ] 17.1 Create TrainingPipelineIntegrationTest
+- [-] 17. Create integration tests
+  - [x] 17.1 Create TrainingPipelineIntegrationTest
     - Test end-to-end training workflow with mocked AWS services
     - Verify S3 orchestration between stages
     - Test error handling and retry logic
     - _Requirements: 16.2, 16.3_
   
-  - [ ] 17.2 Create InferencePipelineIntegrationTest
+  - [x] 17.2 Create InferencePipelineIntegrationTest
     - Test end-to-end inference workflow with mocked AWS services
     - Verify S3 orchestration between stages
     - Test DynamoDB storage and SNS alerting
     - _Requirements: 16.2, 16.3_
   
-  - [ ] 17.3 Git commit and push
+  - [-] 17.3 Git commit and push
     - **Git commit and push**: "test: create integration tests for end-to-end workflows
     
     - Created TrainingPipelineIntegrationTest validating complete training workflow
