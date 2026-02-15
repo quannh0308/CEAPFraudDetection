@@ -70,6 +70,9 @@ class TrainingPipelineStack(
     val dataPrepJob: CfnJob
     val glueRole: Role
     
+    // IAM Roles
+    val sageMakerExecutionRole: Role
+    
     // Lambda Functions
     val dataPrepHandler: Function  // New: replaces Glue job
     val trainHandler: Function
@@ -177,6 +180,23 @@ class TrainingPipelineStack(
             .build()
         
         // ========================================
+        // IAM Roles
+        // ========================================
+        
+        // SageMaker Execution Role
+        sageMakerExecutionRole = Role.Builder.create(this, "SageMakerExecutionRole")
+            .roleName("fraud-detection-sagemaker-role-$envName")
+            .assumedBy(ServicePrincipal("sagemaker.amazonaws.com"))
+            .managedPolicies(listOf(
+                ManagedPolicy.fromAwsManagedPolicyName("AmazonSageMakerFullAccess")
+            ))
+            .build()
+        
+        // Grant S3 permissions to SageMaker role
+        dataBucket.grantReadWrite(sageMakerExecutionRole)
+        modelsBucket.grantReadWrite(sageMakerExecutionRole)
+        
+        // ========================================
         // Lambda Functions
         // ========================================
         
@@ -215,6 +235,7 @@ class TrainingPipelineStack(
                 "WORKFLOW_BUCKET" to workflowBucket.bucketName,
                 "DATA_BUCKET" to dataBucket.bucketName,
                 "MODELS_BUCKET" to modelsBucket.bucketName,
+                "SAGEMAKER_EXECUTION_ROLE_ARN" to sageMakerExecutionRole.roleArn,
                 "LOG_LEVEL" to "INFO"
             ))
             .logRetention(RetentionDays.ONE_MONTH)
@@ -241,7 +262,7 @@ class TrainingPipelineStack(
             PolicyStatement.Builder.create()
                 .effect(Effect.ALLOW)
                 .actions(listOf("iam:PassRole"))
-                .resources(listOf("arn:aws:iam::${this.account}:role/fraud-detection-sagemaker-role-$envName"))
+                .resources(listOf(sageMakerExecutionRole.roleArn))
                 .build()
         )
         
@@ -257,6 +278,7 @@ class TrainingPipelineStack(
                 "ENVIRONMENT" to envName,
                 "WORKFLOW_BUCKET" to workflowBucket.bucketName,
                 "DATA_BUCKET" to dataBucket.bucketName,
+                "SAGEMAKER_EXECUTION_ROLE_ARN" to sageMakerExecutionRole.roleArn,
                 "LOG_LEVEL" to "INFO"
             ))
             .logRetention(RetentionDays.ONE_MONTH)
@@ -288,7 +310,7 @@ class TrainingPipelineStack(
             PolicyStatement.Builder.create()
                 .effect(Effect.ALLOW)
                 .actions(listOf("iam:PassRole"))
-                .resources(listOf("arn:aws:iam::${this.account}:role/fraud-detection-sagemaker-role-$envName"))
+                .resources(listOf(sageMakerExecutionRole.roleArn))
                 .build()
         )
         
@@ -304,6 +326,7 @@ class TrainingPipelineStack(
                 "ENVIRONMENT" to envName,
                 "WORKFLOW_BUCKET" to workflowBucket.bucketName,
                 "CONFIG_BUCKET" to configBucket.bucketName,
+                "SAGEMAKER_EXECUTION_ROLE_ARN" to sageMakerExecutionRole.roleArn,
                 "LOG_LEVEL" to "INFO"
             ))
             .logRetention(RetentionDays.ONE_MONTH)
@@ -333,7 +356,7 @@ class TrainingPipelineStack(
             PolicyStatement.Builder.create()
                 .effect(Effect.ALLOW)
                 .actions(listOf("iam:PassRole"))
-                .resources(listOf("arn:aws:iam::${this.account}:role/fraud-detection-sagemaker-role-$envName"))
+                .resources(listOf(sageMakerExecutionRole.roleArn))
                 .build()
         )
         
