@@ -161,7 +161,12 @@ class DataPrepHandler : WorkflowLambdaHandler() {
     }
     
     /**
-     * Writes dataset to S3 as CSV file.
+     * Writes dataset to S3 as CSV file in SageMaker format.
+     * 
+     * SageMaker XGBoost expects:
+     * - First column is the label (Class)
+     * - No header row
+     * - Label values are 0 or 1
      * 
      * @param data List of CSV rows (including header)
      * @param outputPrefix S3 output prefix
@@ -177,7 +182,23 @@ class DataPrepHandler : WorkflowLambdaHandler() {
         
         logger.info("Writing ${data.size} records to S3: $s3Path")
         
-        val csvContent = data.joinToString("\n")
+        // Reformat CSV for SageMaker: move Class column to first position, remove header
+        val header = data[0].split(",")
+        val classIndex = header.indexOf("Class")
+        
+        if (classIndex == -1) {
+            throw IllegalStateException("Class column not found in dataset")
+        }
+        
+        val reformattedRows = data.drop(1).map { row ->
+            val columns = row.split(",")
+            // Move Class column to first position
+            val classValue = columns[classIndex]
+            val features = columns.filterIndexed { index, _ -> index != classIndex }
+            "$classValue,${features.joinToString(",")}"
+        }
+        
+        val csvContent = reformattedRows.joinToString("\n")
         
         s3Client.putObject(
             PutObjectRequest.builder()
@@ -188,7 +209,7 @@ class DataPrepHandler : WorkflowLambdaHandler() {
             RequestBody.fromString(csvContent)
         )
         
-        logger.info("Successfully wrote dataset to $s3Path")
+        logger.info("Successfully wrote ${reformattedRows.size} records to $s3Path (SageMaker format: label first, no header)")
         return s3Path
     }
 }
