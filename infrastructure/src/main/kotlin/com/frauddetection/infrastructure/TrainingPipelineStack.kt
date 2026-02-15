@@ -186,7 +186,7 @@ class TrainingPipelineStack(
             .runtime(Runtime.JAVA_17)
             .handler("com.fraud.training.DataPrepHandler::handleRequest")
             .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline-1.0.0-SNAPSHOT.jar"))
-            .memorySize(10240) // 10 GB for large dataset processing
+            .memorySize(3008) // Max Lambda memory (3 GB)
             .timeout(Duration.minutes(15)) // Max Lambda timeout
             .environment(mapOf(
                 "ENVIRONMENT" to envName,
