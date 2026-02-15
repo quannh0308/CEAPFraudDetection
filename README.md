@@ -187,11 +187,11 @@ This compiles all Kotlin modules and runs tests:
 ### 5. Upload Dataset to S3
 
 ```bash
-# Create data bucket
-aws s3 mb s3://fraud-detection-data
+# Create data bucket with your unique identifier
+aws s3 mb s3://fraud-detection-data-quannh0308-20260214
 
 # Upload Kaggle dataset
-aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data/
+aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data-quannh0308-20260214/
 ```
 
 ## Deployment Guide
@@ -215,7 +215,7 @@ The training pipeline uses a Standard workflow with Glue and Lambda stages.
 - Step Functions workflow: `FraudDetectionTrainingWorkflow`
 - Lambda functions: `fraud-detection-train-handler`, `fraud-detection-evaluate-handler`, `fraud-detection-deploy-handler`
 - Glue job: `fraud-detection-data-prep`
-- S3 buckets: `fraud-detection-workflow-{account-id}`, `fraud-detection-data`, `fraud-detection-models`, `fraud-detection-config`
+- S3 buckets: `fraud-detection-workflow-{account-id}`, `fraud-detection-data-quannh0308-20260214`, `fraud-detection-models`, `fraud-detection-config`
 - EventBridge rule: Weekly trigger (Sunday 2 AM)
 - SNS topic: `fraud-detection-failures`
 
@@ -250,8 +250,8 @@ The inference pipeline uses an Express workflow with all Lambda stages.
 aws stepfunctions start-execution \
   --state-machine-arn arn:aws:states:us-east-1:{account-id}:stateMachine:FraudDetectionTrainingWorkflow \
   --input '{
-    "datasetS3Path": "s3://fraud-detection-data/kaggle-credit-card-fraud.csv",
-    "outputPrefix": "s3://fraud-detection-data/prepared/",
+    "datasetS3Path": "s3://fraud-detection-data-quannh0308-20260214/kaggle-credit-card-fraud.csv",
+    "outputPrefix": "s3://fraud-detection-data-quannh0308-20260214/prepared/",
     "trainSplit": 0.70,
     "validationSplit": 0.15,
     "testSplit": 0.15
@@ -266,13 +266,13 @@ aws stepfunctions describe-execution \
 
 ```bash
 # Prepare daily transaction batch
-aws s3 cp daily-transactions.json s3://fraud-detection-data/daily-batches/2024-01-15.json
+aws s3 cp daily-transactions.json s3://fraud-detection-data-quannh0308-20260214/daily-batches/2024-01-15.json
 
 # Start inference workflow
 aws stepfunctions start-execution \
   --state-machine-arn arn:aws:states:us-east-1:{account-id}:stateMachine:FraudDetectionInferenceWorkflow \
   --input '{
-    "transactionBatchPath": "s3://fraud-detection-data/daily-batches/2024-01-15.json",
+    "transactionBatchPath": "s3://fraud-detection-data-quannh0308-20260214/daily-batches/2024-01-15.json",
     "batchDate": "2024-01-15"
   }'
 ```
@@ -405,7 +405,7 @@ cat 2024-01-15.json | jq '.'
 **Resolution:**
 1. Verify dataset integrity: `wc -l kaggle-credit-card-fraud.csv`
 2. Re-download dataset from Kaggle
-3. Re-upload to S3: `aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data/`
+3. Re-upload to S3: `aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data-quannh0308-20260214/`
 
 #### Issue: Endpoint deployment timeout
 

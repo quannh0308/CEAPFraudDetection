@@ -8,8 +8,8 @@
   "workflowBucket": "fraud-detection-workflow-123456789012",
   
   "initialData": {
-    "datasetS3Path": "s3://fraud-detection-data/kaggle-credit-card-fraud.csv",
-    "outputPrefix": "s3://fraud-detection-data/prepared/",
+    "datasetS3Path": "s3://fraud-detection-data-quannh0308-20260214/kaggle-credit-card-fraud.csv",
+    "outputPrefix": "s3://fraud-detection-data-quannh0308-20260214/prepared/",
     "trainSplit": 0.70,
     "validationSplit": 0.15,
     "testSplit": 0.15

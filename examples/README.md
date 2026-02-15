@@ -46,7 +46,7 @@ Example format for daily transaction batches that are scored by the inference pi
 **Upload to S3:**
 ```bash
 aws s3 cp examples/transaction-batch.json \
-  s3://fraud-detection-data/daily-batches/2024-01-15.json
+  s3://fraud-detection-data-quannh0308-20260214/daily-batches/2024-01-15.json
 ```
 
 ## Lambda Handler Configurations

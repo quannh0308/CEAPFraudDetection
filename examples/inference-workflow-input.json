@@ -8,7 +8,7 @@
   "workflowBucket": "fraud-detection-workflow-123456789012",
   
   "initialData": {
-    "transactionBatchPath": "s3://fraud-detection-data/daily-batches/2024-01-15.json",
+    "transactionBatchPath": "s3://fraud-detection-data-quannh0308-20260214/daily-batches/2024-01-15.json",
     "batchDate": "2024-01-15"
   },
   

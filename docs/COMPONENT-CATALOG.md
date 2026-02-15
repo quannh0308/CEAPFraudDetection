@@ -28,8 +28,8 @@ This document provides a comprehensive catalog of all components in the fraud de
 **Format**: JSON
 ```json
 {
-  "datasetS3Path": "s3://fraud-detection-data/kaggle-credit-card-fraud.csv",
-  "outputPrefix": "s3://fraud-detection-data/prepared/",
+  "datasetS3Path": "s3://fraud-detection-data-quannh0308-20260214/kaggle-credit-card-fraud.csv",
+  "outputPrefix": "s3://fraud-detection-data-quannh0308-20260214/prepared/",
   "trainSplit": 0.70,
   "validationSplit": 0.15,
   "testSplit": 0.15
@@ -64,9 +64,9 @@ This document provides a comprehensive catalog of all components in the fraud de
 **Format**: JSON
 ```json
 {
-  "trainDataPath": "s3://fraud-detection-data/prepared/train.parquet",
-  "validationDataPath": "s3://fraud-detection-data/prepared/validation.parquet",
-  "testDataPath": "s3://fraud-detection-data/prepared/test.parquet",
+  "trainDataPath": "s3://fraud-detection-data-quannh0308-20260214/prepared/train.parquet",
+  "validationDataPath": "s3://fraud-detection-data-quannh0308-20260214/prepared/validation.parquet",
+  "testDataPath": "s3://fraud-detection-data-quannh0308-20260214/prepared/test.parquet",
   "recordCounts": {
     "train": 199363,
     "validation": 42721,
@@ -88,9 +88,9 @@ This document provides a comprehensive catalog of all components in the fraud de
 #### Side Effects
 
 - **S3 Writes**: 3 Parquet files written to S3
-  - `s3://fraud-detection-data/prepared/train.parquet` (~140 MB)
-  - `s3://fraud-detection-data/prepared/validation.parquet` (~30 MB)
-  - `s3://fraud-detection-data/prepared/test.parquet` (~30 MB)
+  - `s3://fraud-detection-data-quannh0308-20260214/prepared/train.parquet` (~140 MB)
+  - `s3://fraud-detection-data-quannh0308-20260214/prepared/validation.parquet` (~30 MB)
+  - `s3://fraud-detection-data-quannh0308-20260214/prepared/test.parquet` (~30 MB)
 
 - **CloudWatch Logs**: Glue job execution logs
 
