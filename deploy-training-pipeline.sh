@@ -120,21 +120,6 @@ if [ -z "${BUCKET_SUFFIX:-}" ]; then
     export BUCKET_SUFFIX=quannh0308-20260214
 fi
 log_success "BUCKET_SUFFIX: $BUCKET_SUFFIX"
-fi
-log_success "AWS_REGION: $AWS_REGION"
-
-if [ -z "${AWS_ACCOUNT_ID:-}" ]; then
-    log_error "AWS_ACCOUNT_ID environment variable is not set"
-    log_info "Example: export AWS_ACCOUNT_ID=123456789012"
-    exit 1
-fi
-log_success "AWS_ACCOUNT_ID: $AWS_ACCOUNT_ID"
-
-if [ -z "${ENVIRONMENT:-}" ]; then
-    log_warning "ENVIRONMENT not set, defaulting to 'dev'"
-    export ENVIRONMENT=dev
-fi
-log_success "ENVIRONMENT: $ENVIRONMENT"
 
 # Verify AWS credentials
 log_info "Verifying AWS credentials..."
