@@ -76,6 +76,7 @@ class TrainingPipelineStack(
     // Lambda Functions
     val dataPrepHandler: Function  // New: replaces Glue job
     val trainHandler: Function
+    val checkTrainingStatusHandler: Function  // New: polls training job status
     val evaluateHandler: Function
     val deployHandler: Function
     
@@ -266,6 +267,35 @@ class TrainingPipelineStack(
                 .build()
         )
         
+        // CheckTrainingStatus Handler Lambda (polls training job status)
+        checkTrainingStatusHandler = Function.Builder.create(this, "CheckTrainingStatusHandler")
+            .functionName("fraud-detection-check-training-status-$envName")
+            .runtime(Runtime.JAVA_17)
+            .handler("com.fraud.training.CheckTrainingStatusHandler::handleRequest")
+            .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline.jar"))
+            .memorySize(256)
+            .timeout(Duration.seconds(30))
+            .environment(mapOf(
+                "ENVIRONMENT" to envName,
+                "WORKFLOW_BUCKET" to workflowBucket.bucketName,
+                "LOG_LEVEL" to "INFO"
+            ))
+            .logRetention(RetentionDays.ONE_MONTH)
+            .build()
+        
+        // Grant permissions to CheckTrainingStatus Handler
+        workflowBucket.grantReadWrite(checkTrainingStatusHandler)
+        
+        checkTrainingStatusHandler.addToRolePolicy(
+            PolicyStatement.Builder.create()
+                .effect(Effect.ALLOW)
+                .actions(listOf(
+                    "sagemaker:DescribeTrainingJob"
+                ))
+                .resources(listOf("*"))
+                .build()
+        )
+        
         // Evaluate Handler Lambda
         evaluateHandler = Function.Builder.create(this, "EvaluateHandler")
             .functionName("fraud-detection-evaluate-$envName")
@@ -426,6 +456,26 @@ class TrainingPipelineStack(
                     .build()
             )
         
+        // Wait 5 minutes before checking training status
+        val waitForTraining = software.amazon.awscdk.services.stepfunctions.Wait.Builder.create(this, "WaitForTraining")
+            .time(software.amazon.awscdk.services.stepfunctions.WaitTime.duration(Duration.minutes(5)))
+            .comment("Wait 5 minutes before checking training job status")
+            .build()
+        
+        // Check Training Status Task
+        val checkTrainingStatusTask = LambdaInvoke.Builder.create(this, "CheckTrainingStatusTask")
+            .lambdaFunction(checkTrainingStatusHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "CheckTrainingStatusStage",
+                "previousStage" to "TrainStage",
+                "workflowBucket" to workflowBucket.bucketName,
+                "initialData.$" to "$"
+            )))
+            .outputPath("$.Payload")
+            .retryOnServiceExceptions(true)
+            .build()
+        
         // Evaluate Task (Lambda)
         val evaluateTask = LambdaInvoke.Builder.create(this, "EvaluateTask")
             .lambdaFunction(evaluateHandler)
@@ -493,10 +543,39 @@ class TrainingPipelineStack(
             .comment("Training workflow completed successfully")
             .build()
         
-        // Chain tasks: DataPrep → Train → Evaluate → Deploy → Success
+        // Training failed state
+        val trainingJobFailed = Fail.Builder.create(this, "TrainingJobFailed")
+            .cause("SageMaker training job failed")
+            .error("TrainingJobError")
+            .build()
+        
+        // Connect wait loop: Wait → CheckStatus → Choice
+        waitForTraining.next(checkTrainingStatusTask)
+        
+        // Choice state to check if training is complete
+        val isTrainingComplete = software.amazon.awscdk.services.stepfunctions.Choice.Builder.create(this, "IsTrainingComplete")
+            .comment("Check if training job is complete or failed")
+            .build()
+        
+        checkTrainingStatusTask.next(isTrainingComplete)
+        
+        isTrainingComplete
+            .when(
+                software.amazon.awscdk.services.stepfunctions.Condition.booleanEquals("$.isComplete", true),
+                evaluateTask
+            )
+            .when(
+                software.amazon.awscdk.services.stepfunctions.Condition.booleanEquals("$.isFailed", true),
+                trainingJobFailed
+            )
+            .otherwise(waitForTraining)
+        
+        // Chain tasks: DataPrep → Train → Wait → CheckStatus → Choice → [Evaluate → Deploy → Success | Fail | Wait]
         val definition = dataPrepTask
             .next(trainTask)
-            .next(evaluateTask)
+            .next(waitForTraining)
+        
+        evaluateTask
             .next(deployTask)
             .next(workflowSuccess)
         
