@@ -367,6 +367,12 @@ class TrainingPipelineStack(
         // DataPrep Task (Lambda - replaces Glue job)
         val dataPrepTask = LambdaInvoke.Builder.create(this, "DataPrepTask")
             .lambdaFunction(dataPrepHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "DataPrepStage",
+                "workflowBucket" to workflowBucket.bucketName,
+                "initialData.$" to "$"
+            )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
             .build()
@@ -392,6 +398,12 @@ class TrainingPipelineStack(
         // Train Task (Lambda)
         val trainTask = LambdaInvoke.Builder.create(this, "TrainTask")
             .lambdaFunction(trainHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "TrainStage",
+                "previousStage" to "DataPrepStage",
+                "workflowBucket" to workflowBucket.bucketName
+            )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
             .build()
@@ -417,6 +429,12 @@ class TrainingPipelineStack(
         // Evaluate Task (Lambda)
         val evaluateTask = LambdaInvoke.Builder.create(this, "EvaluateTask")
             .lambdaFunction(evaluateHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "EvaluateStage",
+                "previousStage" to "TrainStage",
+                "workflowBucket" to workflowBucket.bucketName
+            )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
             .build()
@@ -442,6 +460,12 @@ class TrainingPipelineStack(
         // Deploy Task (Lambda)
         val deployTask = LambdaInvoke.Builder.create(this, "DeployTask")
             .lambdaFunction(deployHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "DeployStage",
+                "previousStage" to "EvaluateStage",
+                "workflowBucket" to workflowBucket.bucketName
+            )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
             .build()
