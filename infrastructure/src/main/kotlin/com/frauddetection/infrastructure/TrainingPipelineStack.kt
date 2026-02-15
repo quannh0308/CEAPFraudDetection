@@ -62,7 +62,7 @@ class TrainingPipelineStack(
     
     // S3 Buckets
     val workflowBucket: Bucket
-    val dataBucket: Bucket
+    val dataBucket: software.amazon.awscdk.services.s3.IBucket
     val modelsBucket: Bucket
     val configBucket: Bucket
     
@@ -106,20 +106,12 @@ class TrainingPipelineStack(
             .build()
         
         // Data bucket for raw and prepared datasets
-        dataBucket = Bucket.Builder.create(this, "DataBucket")
-            .bucketName("fraud-detection-data-$bucketSuffix")
-            .versioned(false)
-            .encryption(BucketEncryption.S3_MANAGED)
-            .blockPublicAccess(BlockPublicAccess.BLOCK_ALL)
-            .lifecycleRules(listOf(
-                LifecycleRule.builder()
-                    .id("DeleteOldPreparedData")
-                    .prefix("prepared/")
-                    .expiration(Duration.days(30))
-                    .enabled(true)
-                    .build()
-            ))
-            .build()
+        // Import existing bucket instead of creating new one
+        dataBucket = Bucket.fromBucketName(
+            this,
+            "DataBucket",
+            "fraud-detection-data-$bucketSuffix"
+        )
         
         // Models bucket for trained model artifacts
         modelsBucket = Bucket.Builder.create(this, "ModelsBucket")
