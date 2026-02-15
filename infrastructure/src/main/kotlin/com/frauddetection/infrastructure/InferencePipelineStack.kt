@@ -150,7 +150,7 @@ class InferencePipelineStack(
             .functionName("fraud-detection-score-$envName")
             .runtime(Runtime.JAVA_17)
             .handler("com.fraud.inference.ScoreHandler::handleRequest")
-            .code(Code.fromAsset("../fraud-inference-pipeline/build/libs/fraud-inference-pipeline-1.0.0-SNAPSHOT.jar"))
+            .code(Code.fromAsset("../fraud-inference-pipeline/build/libs/fraud-inference-pipeline.jar"))
             .memorySize(1024)
             .timeout(Duration.minutes(5))
             .environment(mapOf(
@@ -192,7 +192,7 @@ class InferencePipelineStack(
             .functionName("fraud-detection-store-$envName")
             .runtime(Runtime.JAVA_17)
             .handler("com.fraud.inference.StoreHandler::handleRequest")
-            .code(Code.fromAsset("../fraud-inference-pipeline/build/libs/fraud-inference-pipeline-1.0.0-SNAPSHOT.jar"))
+            .code(Code.fromAsset("../fraud-inference-pipeline/build/libs/fraud-inference-pipeline.jar"))
             .memorySize(512)
             .timeout(Duration.minutes(5))
             .environment(mapOf(
@@ -223,7 +223,7 @@ class InferencePipelineStack(
             .functionName("fraud-detection-alert-$envName")
             .runtime(Runtime.JAVA_17)
             .handler("com.fraud.inference.AlertHandler::handleRequest")
-            .code(Code.fromAsset("../fraud-inference-pipeline/build/libs/fraud-inference-pipeline-1.0.0-SNAPSHOT.jar"))
+            .code(Code.fromAsset("../fraud-inference-pipeline/build/libs/fraud-inference-pipeline.jar"))
             .memorySize(512)
             .timeout(Duration.minutes(2))
             .environment(mapOf(
@@ -254,7 +254,7 @@ class InferencePipelineStack(
             .functionName("fraud-detection-monitor-$envName")
             .runtime(Runtime.JAVA_17)
             .handler("com.fraud.inference.MonitorHandler::handleRequest")
-            .code(Code.fromAsset("../fraud-inference-pipeline/build/libs/fraud-inference-pipeline-1.0.0-SNAPSHOT.jar"))
+            .code(Code.fromAsset("../fraud-inference-pipeline/build/libs/fraud-inference-pipeline.jar"))
             .memorySize(512)
             .timeout(Duration.minutes(2))
             .environment(mapOf(

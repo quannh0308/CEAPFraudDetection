@@ -185,7 +185,7 @@ class TrainingPipelineStack(
             .functionName("fraud-detection-dataprep-$envName")
             .runtime(Runtime.JAVA_17)
             .handler("com.fraud.training.DataPrepHandler::handleRequest")
-            .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline-1.0.0-SNAPSHOT.jar"))
+            .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline.jar"))
             .memorySize(3008) // Max Lambda memory (3 GB)
             .timeout(Duration.minutes(15)) // Max Lambda timeout
             .environment(mapOf(
@@ -207,7 +207,7 @@ class TrainingPipelineStack(
             .functionName("fraud-detection-train-$envName")
             .runtime(Runtime.JAVA_17)
             .handler("com.fraud.training.TrainHandler::handleRequest")
-            .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline-1.0.0-SNAPSHOT.jar"))
+            .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline.jar"))
             .memorySize(1024)
             .timeout(Duration.minutes(15))
             .environment(mapOf(
@@ -250,7 +250,7 @@ class TrainingPipelineStack(
             .functionName("fraud-detection-evaluate-$envName")
             .runtime(Runtime.JAVA_17)
             .handler("com.fraud.training.EvaluateHandler::handleRequest")
-            .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline-1.0.0-SNAPSHOT.jar"))
+            .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline.jar"))
             .memorySize(1024)
             .timeout(Duration.minutes(15))
             .environment(mapOf(
@@ -297,7 +297,7 @@ class TrainingPipelineStack(
             .functionName("fraud-detection-deploy-$envName")
             .runtime(Runtime.JAVA_17)
             .handler("com.fraud.training.DeployHandler::handleRequest")
-            .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline-1.0.0-SNAPSHOT.jar"))
+            .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline.jar"))
             .memorySize(512)
             .timeout(Duration.minutes(15))
             .environment(mapOf(
