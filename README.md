@@ -1,6 +1,12 @@
 # Fraud Detection ML Pipeline
 
+**Version:** 1.0.0-glue (Stable Milestone - Glue-based Data Preparation)  
+**Status:** ✅ Deployed and Tested  
+**Date:** February 15, 2026
+
 A production-ready fraud detection system demonstrating the CEAP (Customer Engagement & Action Platform) workflow orchestration framework. The system implements two ML pipelines orchestrated via AWS Step Functions: a weekly training pipeline that builds and deploys fraud detection models to SageMaker, and a daily inference pipeline that scores transactions and alerts on high-risk cases.
+
+> **📌 Milestone Note:** This version uses AWS Glue for data preparation (PySpark). See `MILESTONE-GLUE-VERSION.md` for complete documentation of this stable release. A Lambda-based alternative is available for accounts with Glue service quota restrictions.
 
 ## Table of Contents
 
