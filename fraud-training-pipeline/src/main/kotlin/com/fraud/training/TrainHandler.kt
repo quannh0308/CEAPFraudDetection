@@ -155,45 +155,14 @@ open class TrainHandler(
         // 3. Start training job
         logger.info("Starting SageMaker training job: $trainingJobName")
         sageMakerClient.createTrainingJob(trainingJobRequest)
+        logger.info("Training job started successfully: $trainingJobName")
         
-        // 4. Wait for training completion (with timeout)
-        logger.info("Waiting for training job to complete: $trainingJobName")
-        val waiter = sageMakerClient.waiter()
+        // Note: Training takes 1-2 hours. We return immediately and let the job run asynchronously.
+        // Step Functions will need to poll or wait for completion in a separate state.
+        // For this demo, we'll return the expected paths and let downstream stages handle errors.
         
-        try {
-            waiter.waitUntilTrainingJobCompletedOrStopped(
-                DescribeTrainingJobRequest.builder()
-                    .trainingJobName(trainingJobName)
-                    .build()
-            )
-        } catch (e: Exception) {
-            logger.error("Error waiting for training job completion: ${e.message}", e)
-            throw IllegalStateException(
-                "Training job did not complete within timeout: $trainingJobName. Error: ${e.message}",
-                e
-            )
-        }
-        
-        // 5. Check training status
-        val describeResponse = sageMakerClient.describeTrainingJob(
-            DescribeTrainingJobRequest.builder()
-                .trainingJobName(trainingJobName)
-                .build()
-        )
-        
-        val trainingJobStatus = describeResponse.trainingJobStatus()
-        logger.info("Training job status: $trainingJobStatus")
-        
-        if (trainingJobStatus != TrainingJobStatus.COMPLETED) {
-            val failureReason = describeResponse.failureReason() ?: "Unknown failure reason"
-            throw IllegalStateException(
-                "Training job failed with status: $trainingJobStatus. Reason: $failureReason"
-            )
-        }
-        
-        // 6. Return training job metadata
-        val modelArtifactPath = describeResponse.modelArtifacts().s3ModelArtifacts()
-        logger.info("Training completed successfully. Model artifact: $modelArtifactPath")
+        val modelArtifactPath = "s3://${modelsBucket}/$trainingJobName/output/model.tar.gz"
+        logger.info("Training job submitted. Model artifacts will be at: $modelArtifactPath")
         
         // Pass through testDataPath for EvaluateStage
         val testDataPath = input.get("testDataPath")?.asText()
@@ -201,7 +170,8 @@ open class TrainHandler(
         return objectMapper.createObjectNode().apply {
             put("trainingJobName", trainingJobName)
             put("modelArtifactPath", modelArtifactPath)
-            put("trainingJobStatus", trainingJobStatus.toString())
+            put("trainingJobStatus", "InProgress")
+            put("note", "Training job is running asynchronously in SageMaker. Check console for status.")
             if (testDataPath != null) {
                 put("testDataPath", testDataPath)
             }
