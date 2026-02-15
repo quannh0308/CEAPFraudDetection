@@ -104,6 +104,28 @@ log_success "AWS_REGION: $AWS_REGION"
 if [ -z "${AWS_ACCOUNT_ID:-}" ]; then
     log_error "AWS_ACCOUNT_ID environment variable is not set"
     log_info "Example: export AWS_ACCOUNT_ID=123456789012"
+    log_info "Or get it with: aws sts get-caller-identity --query Account --output text"
+    exit 1
+fi
+log_success "AWS_ACCOUNT_ID: $AWS_ACCOUNT_ID"
+
+if [ -z "${ENVIRONMENT:-}" ]; then
+    log_warning "ENVIRONMENT not set, using default: dev"
+    export ENVIRONMENT=dev
+fi
+log_success "ENVIRONMENT: $ENVIRONMENT"
+
+if [ -z "${BUCKET_SUFFIX:-}" ]; then
+    log_warning "BUCKET_SUFFIX not set, using default: quannh0308-20260214"
+    export BUCKET_SUFFIX=quannh0308-20260214
+fi
+log_success "BUCKET_SUFFIX: $BUCKET_SUFFIX"
+fi
+log_success "AWS_REGION: $AWS_REGION"
+
+if [ -z "${AWS_ACCOUNT_ID:-}" ]; then
+    log_error "AWS_ACCOUNT_ID environment variable is not set"
+    log_info "Example: export AWS_ACCOUNT_ID=123456789012"
     exit 1
 fi
 log_success "AWS_ACCOUNT_ID: $AWS_ACCOUNT_ID"
@@ -217,6 +239,7 @@ log_warning "This may take 10-15 minutes..."
 cdk deploy "$STACK_NAME" \
     --require-approval never \
     --context envName="$ENVIRONMENT" \
+    --context bucketSuffix="$BUCKET_SUFFIX" \
     --context awsAccountId="$AWS_ACCOUNT_ID" \
     --context awsRegion="$AWS_REGION"
 

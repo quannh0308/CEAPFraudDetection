@@ -56,12 +56,20 @@ aws s3 ls s3://fraud-detection-data-quannh0308-20260214/
 # Set your AWS region
 export AWS_REGION=us-east-1
 
+# Set your AWS account ID (get it with this command)
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Set your unique bucket suffix (IMPORTANT!)
+export BUCKET_SUFFIX=quannh0308-20260214
+
 # Set environment name (dev, staging, prod)
 export ENVIRONMENT=dev
 
 # Verify your AWS account
 aws sts get-caller-identity
 ```
+
+**Important:** The `BUCKET_SUFFIX` must match the suffix you used when creating the S3 bucket in Step 2!
 
 ## Step 4: Deploy Training Pipeline
 
@@ -80,6 +88,12 @@ chmod +x deploy-training-pipeline.sh
 - Deploys CDK infrastructure stack
 - Creates Step Functions workflow
 - Sets up EventBridge schedule (weekly)
+
+**S3 Buckets Created:**
+- `fraud-detection-data-quannh0308-20260214` (uses your existing bucket)
+- `fraud-detection-workflow-quannh0308-20260214` (created by CDK)
+- `fraud-detection-models-quannh0308-20260214` (created by CDK)
+- `fraud-detection-config-quannh0308-20260214` (created by CDK)
 
 ## Step 5: Deploy Inference Pipeline
 

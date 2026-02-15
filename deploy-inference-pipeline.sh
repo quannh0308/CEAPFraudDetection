@@ -114,6 +114,12 @@ if [ -z "${ENVIRONMENT:-}" ]; then
 fi
 log_success "ENVIRONMENT: $ENVIRONMENT"
 
+if [ -z "${BUCKET_SUFFIX:-}" ]; then
+    log_warning "BUCKET_SUFFIX not set, using default: quannh0308-20260214"
+    export BUCKET_SUFFIX=quannh0308-20260214
+fi
+log_success "BUCKET_SUFFIX: $BUCKET_SUFFIX"
+
 # Verify AWS credentials
 log_info "Verifying AWS credentials..."
 if ! aws sts get-caller-identity &> /dev/null; then
@@ -190,6 +196,7 @@ log_warning "This may take 5-10 minutes..."
 cdk deploy "$STACK_NAME" \
     --require-approval never \
     --context envName="$ENVIRONMENT" \
+    --context bucketSuffix="$BUCKET_SUFFIX" \
     --context awsAccountId="$AWS_ACCOUNT_ID" \
     --context awsRegion="$AWS_REGION" \
     --context trainingStackName="$TRAINING_STACK_NAME"

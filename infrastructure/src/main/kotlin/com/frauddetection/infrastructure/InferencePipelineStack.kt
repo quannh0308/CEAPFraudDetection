@@ -60,7 +60,8 @@ class InferencePipelineStack(
     id: String,
     props: StackProps,
     val envName: String,
-    val trainingStackName: String
+    val trainingStackName: String,
+    val bucketSuffix: String = System.getenv("BUCKET_SUFFIX") ?: "default"
 ) : Stack(scope, id, props) {
     
     // DynamoDB Table

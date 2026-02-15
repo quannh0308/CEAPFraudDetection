@@ -56,7 +56,8 @@ class TrainingPipelineStack(
     scope: Construct,
     id: String,
     props: StackProps,
-    val envName: String
+    val envName: String,
+    val bucketSuffix: String = System.getenv("BUCKET_SUFFIX") ?: "default"
 ) : Stack(scope, id, props) {
     
     // S3 Buckets
@@ -90,7 +91,7 @@ class TrainingPipelineStack(
         
         // Workflow bucket for Step Functions intermediate storage
         workflowBucket = Bucket.Builder.create(this, "WorkflowBucket")
-            .bucketName("fraud-detection-workflow-$envName-${this.account}")
+            .bucketName("fraud-detection-workflow-$bucketSuffix")
             .versioned(false)
             .encryption(BucketEncryption.S3_MANAGED)
             .blockPublicAccess(BlockPublicAccess.BLOCK_ALL)
@@ -106,7 +107,7 @@ class TrainingPipelineStack(
         
         // Data bucket for raw and prepared datasets
         dataBucket = Bucket.Builder.create(this, "DataBucket")
-            .bucketName("fraud-detection-data-$envName-${this.account}")
+            .bucketName("fraud-detection-data-$bucketSuffix")
             .versioned(false)
             .encryption(BucketEncryption.S3_MANAGED)
             .blockPublicAccess(BlockPublicAccess.BLOCK_ALL)
@@ -122,7 +123,7 @@ class TrainingPipelineStack(
         
         // Models bucket for trained model artifacts
         modelsBucket = Bucket.Builder.create(this, "ModelsBucket")
-            .bucketName("fraud-detection-models-$envName-${this.account}")
+            .bucketName("fraud-detection-models-$bucketSuffix")
             .versioned(true)
             .encryption(BucketEncryption.S3_MANAGED)
             .blockPublicAccess(BlockPublicAccess.BLOCK_ALL)
@@ -137,7 +138,7 @@ class TrainingPipelineStack(
         
         // Config bucket for endpoint metadata
         configBucket = Bucket.Builder.create(this, "ConfigBucket")
-            .bucketName("fraud-detection-config-$envName-${this.account}")
+            .bucketName("fraud-detection-config-$bucketSuffix")
             .versioned(true)
             .encryption(BucketEncryption.S3_MANAGED)
             .blockPublicAccess(BlockPublicAccess.BLOCK_ALL)

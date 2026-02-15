@@ -26,8 +26,9 @@ class InferencePipelineStackTest : FunSpec({
             app,
             "TestInferenceStack",
             software.amazon.awscdk.StackProps.builder().build(),
-            "test",
-            "TestTrainingStack"
+            envName = "test",
+            trainingStackName = "TestTrainingStack",
+            bucketSuffix = "test-suffix"
         )
         
         // Then - should not throw exception
@@ -47,8 +48,9 @@ class InferencePipelineStackTest : FunSpec({
             app,
             "TestInferenceStack",
             software.amazon.awscdk.StackProps.builder().build(),
-            "test",
-            "TestTrainingStack"
+            envName = "test",
+            trainingStackName = "TestTrainingStack",
+            bucketSuffix = "test-suffix"
         )
         
         // When
@@ -92,8 +94,9 @@ class InferencePipelineStackTest : FunSpec({
             app,
             "TestInferenceStack",
             software.amazon.awscdk.StackProps.builder().build(),
-            "test",
-            "TestTrainingStack"
+            envName = "test",
+            trainingStackName = "TestTrainingStack",
+            bucketSuffix = "test-suffix"
         )
         
         // When
