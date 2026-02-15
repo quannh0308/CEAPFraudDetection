@@ -158,6 +158,18 @@ class TrainingPipelineStack(
         dataBucket.grantReadWrite(glueRole)
         workflowBucket.grantReadWrite(glueRole)
         
+        // Grant permission to read Glue script from S3
+        glueRole.addToPrincipalPolicy(
+            PolicyStatement.Builder.create()
+                .effect(Effect.ALLOW)
+                .actions(listOf("s3:GetObject", "s3:ListBucket"))
+                .resources(listOf(
+                    "arn:aws:s3:::fraud-detection-glue-scripts-$envName-${this.account}/*",
+                    "arn:aws:s3:::fraud-detection-glue-scripts-$envName-${this.account}"
+                ))
+                .build()
+        )
+        
         // Create Glue job for data preparation
         dataPrepJob = CfnJob.Builder.create(this, "DataPrepJob")
             .name("fraud-detection-data-prep-$envName")
