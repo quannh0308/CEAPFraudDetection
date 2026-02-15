@@ -105,7 +105,7 @@ open class TrainHandler(
                                 )
                                 .build()
                         )
-                        .contentType("application/x-parquet")
+                        .contentType("text/csv")
                         .build(),
                     Channel.builder()
                         .channelName("validation")
@@ -119,7 +119,7 @@ open class TrainHandler(
                                 )
                                 .build()
                         )
-                        .contentType("application/x-parquet")
+                        .contentType("text/csv")
                         .build()
                 )
             )
