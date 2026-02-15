@@ -1,12 +1,13 @@
 # Fraud Detection ML Pipeline
 
-**Version:** 1.0.0-glue (Stable Milestone - Glue-based Data Preparation)  
+**Version:** 1.1.0-lambda (Lambda-based Data Preparation)  
+**Previous Stable:** 1.0.0-glue (Glue-based - see tag `v1.0.0-glue`)  
 **Status:** ✅ Deployed and Tested  
 **Date:** February 15, 2026
 
 A production-ready fraud detection system demonstrating the CEAP (Customer Engagement & Action Platform) workflow orchestration framework. The system implements two ML pipelines orchestrated via AWS Step Functions: a weekly training pipeline that builds and deploys fraud detection models to SageMaker, and a daily inference pipeline that scores transactions and alerts on high-risk cases.
 
-> **📌 Milestone Note:** This version uses AWS Glue for data preparation (PySpark). See `MILESTONE-GLUE-VERSION.md` for complete documentation of this stable release. A Lambda-based alternative is available for accounts with Glue service quota restrictions.
+> **📌 Version Note:** This version uses **AWS Lambda** for data preparation (10GB memory, 15-min timeout). The original Glue-based version (v1.0.0-glue) is available as a stable milestone for accounts with Glue service quotas enabled. See `MILESTONE-GLUE-VERSION.md` for the Glue implementation.
 
 ## Table of Contents
 
@@ -29,7 +30,7 @@ Trains fraud detection models on historical transaction data and deploys them to
 ```
 ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
 │ Data Prep│→ │  Train   │→ │ Evaluate │→ │  Deploy  │
-│  (Glue)  │  │(SageMaker)│  │ (Lambda) │  │ (Lambda) │
+│ (Lambda) │  │(SageMaker)│  │ (Lambda) │  │ (Lambda) │
 └──────────┘  └──────────┘  └──────────┘  └──────────┘
      ↓              ↓              ↓              ↓
 ┌────────────────────────────────────────────────────┐
@@ -42,7 +43,7 @@ Trains fraud detection models on historical transaction data and deploys them to
 ```
 
 **Stages:**
-1. **DataPrepStage** (Glue): Loads Kaggle Credit Card Fraud dataset, splits into train/validation/test (70/15/15), writes Parquet files
+1. **DataPrepStage** (Lambda): Loads Kaggle Credit Card Fraud dataset, splits into train/validation/test (70/15/15), writes CSV files
 2. **TrainStage** (Lambda): Configures and launches SageMaker XGBoost training job
 3. **EvaluateStage** (Lambda): Creates temporary endpoint, evaluates model on test data, validates accuracy >= 0.90
 4. **DeployStage** (Lambda): Deploys model to production endpoint, performs health check
@@ -219,11 +220,12 @@ The training pipeline uses a Standard workflow with Glue and Lambda stages.
 
 **Created Resources:**
 - Step Functions workflow: `FraudDetectionTrainingWorkflow`
-- Lambda functions: `fraud-detection-train-handler`, `fraud-detection-evaluate-handler`, `fraud-detection-deploy-handler`
-- Glue job: `fraud-detection-data-prep`
-- S3 buckets: `fraud-detection-workflow-{account-id}`, `fraud-detection-data-quannh0308-20260214`, `fraud-detection-models`, `fraud-detection-config`
+- Lambda functions: `fraud-detection-dataprep-handler`, `fraud-detection-train-handler`, `fraud-detection-evaluate-handler`, `fraud-detection-deploy-handler`
+- S3 buckets: `fraud-detection-workflow-quannh0308-20260214`, `fraud-detection-data-quannh0308-20260214`, `fraud-detection-models-quannh0308-20260214`, `fraud-detection-config-quannh0308-20260214`
 - EventBridge rule: Weekly trigger (Sunday 2 AM)
 - SNS topic: `fraud-detection-failures`
+
+> **Note:** The Glue job (`fraud-detection-data-prep`) is still created but deprecated. The workflow now uses the Lambda-based DataPrepHandler.
 
 ### Inference Pipeline Deployment
 
