@@ -111,7 +111,7 @@ open class EvaluateHandler(
                     .modelName(modelName)
                     .primaryContainer(
                         ContainerDefinition.builder()
-                            .image("382416733822.dkr.ecr.us-east-1.amazonaws.com/xgboost:latest")
+                            .image("683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-xgboost:1.7-1")
                             .modelDataUrl(modelArtifactPath)
                             .build()
                     )
