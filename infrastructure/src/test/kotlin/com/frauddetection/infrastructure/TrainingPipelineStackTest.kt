@@ -80,9 +80,9 @@ class TrainingPipelineStackTest : FunSpec({
         }
         
         // Verify minimum required resources exist
-        (s3Buckets >= 4) shouldBe true
-        (glueJobs >= 1) shouldBe true
-        (lambdas >= 3) shouldBe true
+        (s3Buckets >= 3) shouldBe true // workflow, models, config (data bucket is imported)
+        (glueJobs >= 1) shouldBe true // Still have Glue job (deprecated but present)
+        (lambdas >= 4) shouldBe true // DataPrep, Train, Evaluate, Deploy
         (stateMachines >= 1) shouldBe true
         (eventRules >= 1) shouldBe true
     }

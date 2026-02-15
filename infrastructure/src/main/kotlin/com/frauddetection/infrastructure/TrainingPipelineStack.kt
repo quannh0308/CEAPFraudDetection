@@ -66,11 +66,12 @@ class TrainingPipelineStack(
     val modelsBucket: Bucket
     val configBucket: Bucket
     
-    // Glue Job
+    // Glue Job (deprecated - replaced by Lambda)
     val dataPrepJob: CfnJob
     val glueRole: Role
     
     // Lambda Functions
+    val dataPrepHandler: Function  // New: replaces Glue job
     val trainHandler: Function
     val evaluateHandler: Function
     val deployHandler: Function
@@ -178,6 +179,28 @@ class TrainingPipelineStack(
         // ========================================
         // Lambda Functions
         // ========================================
+        
+        // DataPrep Handler Lambda (replaces Glue job)
+        dataPrepHandler = Function.Builder.create(this, "DataPrepHandler")
+            .functionName("fraud-detection-dataprep-$envName")
+            .runtime(Runtime.JAVA_17)
+            .handler("com.fraud.training.DataPrepHandler::handleRequest")
+            .code(Code.fromAsset("../fraud-training-pipeline/build/libs/fraud-training-pipeline-1.0.0-SNAPSHOT.jar"))
+            .memorySize(10240) // 10 GB for large dataset processing
+            .timeout(Duration.minutes(15)) // Max Lambda timeout
+            .environment(mapOf(
+                "ENVIRONMENT" to envName,
+                "WORKFLOW_BUCKET" to workflowBucket.bucketName,
+                "DATA_BUCKET" to dataBucket.bucketName,
+                "LOG_LEVEL" to "INFO"
+            ))
+            .logRetention(RetentionDays.ONE_MONTH)
+            .build()
+        
+        // Grant permissions to DataPrep Handler
+        dataBucket.grantRead(dataPrepHandler)
+        dataBucket.grantWrite(dataPrepHandler)
+        workflowBucket.grantReadWrite(dataPrepHandler)
         
         // Train Handler Lambda
         trainHandler = Function.Builder.create(this, "TrainHandler")
@@ -318,11 +341,11 @@ class TrainingPipelineStack(
         // Step Functions Workflow
         // ========================================
         
-        // DataPrep Task (Glue Job)
-        val dataPrepTask = GlueStartJobRun.Builder.create(this, "DataPrepTask")
-            .glueJobName(dataPrepJob.name!!)
-            .integrationPattern(software.amazon.awscdk.services.stepfunctions.IntegrationPattern.RUN_JOB)
-            .resultPath("$.dataPrepResult")
+        // DataPrep Task (Lambda - replaces Glue job)
+        val dataPrepTask = LambdaInvoke.Builder.create(this, "DataPrepTask")
+            .lambdaFunction(dataPrepHandler)
+            .outputPath("$.Payload")
+            .retryOnServiceExceptions(true)
             .build()
             .addRetry(
                 RetryProps.builder()
