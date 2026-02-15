@@ -24,6 +24,8 @@ import software.amazon.awscdk.services.s3.LifecycleRule
 import software.amazon.awscdk.services.stepfunctions.*
 import software.amazon.awscdk.services.stepfunctions.tasks.GlueStartJobRun
 import software.amazon.awscdk.services.stepfunctions.tasks.LambdaInvoke
+import software.amazon.awscdk.services.stepfunctions.tasks.SageMakerCreateTrainingJob
+import software.amazon.awscdk.services.stepfunctions.tasks.SageMakerCreateTrainingJobProps
 import software.constructs.Construct
 
 /**
@@ -366,15 +368,63 @@ class TrainingPipelineStack(
                     .build()
             )
         
-        // Train Task (Lambda)
-        val trainTask = LambdaInvoke.Builder.create(this, "TrainTask")
-            .lambdaFunction(trainHandler)
-            .outputPath("$.Payload")
-            .retryOnServiceExceptions(true)
+        // Train Task (Native SageMaker Integration - replaces Lambda)
+        // Step Functions directly creates and waits for SageMaker training job
+        val trainTask = software.amazon.awscdk.services.stepfunctions.tasks.SageMakerCreateTrainingJob.Builder.create(this, "TrainTask")
+            .trainingJobName(software.amazon.awscdk.services.stepfunctions.JsonPath.stringAt("States.Format('fraud-detection-{}', $.executionId)"))
+            .role(sageMakerExecutionRole)
+            .algorithmSpecification(software.amazon.awscdk.services.stepfunctions.tasks.AlgorithmSpecification.builder()
+                .trainingImage(software.amazon.awscdk.services.stepfunctions.tasks.DockerImage.fromRegistry("683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-xgboost:1.7-1"))
+                .trainingInputMode(software.amazon.awscdk.services.stepfunctions.tasks.InputMode.FILE)
+                .build())
+            .inputDataConfig(listOf(
+                software.amazon.awscdk.services.stepfunctions.tasks.Channel.builder()
+                    .channelName("train")
+                    .dataSource(software.amazon.awscdk.services.stepfunctions.tasks.DataSource.builder()
+                        .s3DataSource(software.amazon.awscdk.services.stepfunctions.tasks.S3DataSource.builder()
+                            .s3Location(software.amazon.awscdk.services.stepfunctions.tasks.S3Location.fromJsonExpression("$.trainDataPath"))
+                            .build())
+                        .build())
+                    .contentType("application/x-parquet")
+                    .build(),
+                software.amazon.awscdk.services.stepfunctions.tasks.Channel.builder()
+                    .channelName("validation")
+                    .dataSource(software.amazon.awscdk.services.stepfunctions.tasks.DataSource.builder()
+                        .s3DataSource(software.amazon.awscdk.services.stepfunctions.tasks.S3DataSource.builder()
+                            .s3Location(software.amazon.awscdk.services.stepfunctions.tasks.S3Location.fromJsonExpression("$.validationDataPath"))
+                            .build())
+                        .build())
+                    .contentType("application/x-parquet")
+                    .build()
+            ))
+            .outputDataConfig(software.amazon.awscdk.services.stepfunctions.tasks.OutputDataConfig.builder()
+                .s3OutputLocation(software.amazon.awscdk.services.stepfunctions.tasks.S3Location.fromBucket(modelsBucket, ""))
+                .build())
+            .resourceConfig(software.amazon.awscdk.services.stepfunctions.tasks.ResourceConfig.builder()
+                .instanceCount(1)
+                .instanceType(software.amazon.awscdk.services.ec2.InstanceType.of(
+                    software.amazon.awscdk.services.ec2.InstanceClass.MEMORY5,
+                    software.amazon.awscdk.services.ec2.InstanceSize.XLARGE
+                ))
+                .volumeSize(software.amazon.awscdk.Size.gibibytes(30))
+                .build())
+            .stoppingCondition(software.amazon.awscdk.services.stepfunctions.tasks.StoppingCondition.builder()
+                .maxRuntime(Duration.hours(1))
+                .build())
+            .hyperparameters(mapOf(
+                "objective" to "binary:logistic",
+                "num_round" to "100",
+                "max_depth" to "5",
+                "eta" to "0.2",
+                "subsample" to "0.8",
+                "colsample_bytree" to "0.8"
+            ))
+            .integrationPattern(software.amazon.awscdk.services.stepfunctions.IntegrationPattern.RUN_JOB)
+            .resultPath("$.trainingResult")
             .build()
             .addRetry(
                 RetryProps.builder()
-                    .errors(listOf("States.TaskFailed", "States.Timeout", "Lambda.ServiceException"))
+                    .errors(listOf("States.TaskFailed", "States.Timeout"))
                     .interval(Duration.seconds(30))
                     .maxAttempts(2)
                     .backoffRate(2.0)
