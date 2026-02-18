@@ -364,9 +364,9 @@ class TrainingPipelineStack(
                 "--workflow_bucket" to workflowBucket.bucketName,
                 "--dataset_s3_path.$" to "$.datasetS3Path",
                 "--output_prefix.$" to "$.outputPrefix",
-                "--train_split.$" to "$.trainSplit",
-                "--validation_split.$" to "$.validationSplit",
-                "--test_split.$" to "$.testSplit"
+                "--train_split.$" to "States.Format('{}', $.trainSplit)",
+                "--validation_split.$" to "States.Format('{}', $.validationSplit)",
+                "--test_split.$" to "States.Format('{}', $.testSplit)"
             )))
             .resultPath("$.dataPrepResult")
             .build()
