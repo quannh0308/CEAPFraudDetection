@@ -359,6 +359,15 @@ class TrainingPipelineStack(
         val dataPrepTask = GlueStartJobRun.Builder.create(this, "DataPrepTask")
             .glueJobName(dataPrepJob.name!!)
             .integrationPattern(software.amazon.awscdk.services.stepfunctions.IntegrationPattern.RUN_JOB)
+            .arguments(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "--execution_id.$" to "$$.Execution.Name",
+                "--workflow_bucket" to workflowBucket.bucketName,
+                "--dataset_s3_path.$" to "$.datasetS3Path",
+                "--output_prefix.$" to "$.outputPrefix",
+                "--train_split.$" to "$.trainSplit",
+                "--validation_split.$" to "$.validationSplit",
+                "--test_split.$" to "$.testSplit"
+            )))
             .resultPath("$.dataPrepResult")
             .build()
             .addRetry(
