@@ -392,7 +392,7 @@ class TrainingPipelineStack(
         // Train Task (Native SageMaker Integration - replaces Lambda)
         // Step Functions directly creates and waits for SageMaker training job
         val trainTask = software.amazon.awscdk.services.stepfunctions.tasks.SageMakerCreateTrainingJob.Builder.create(this, "TrainTask")
-            .trainingJobName(software.amazon.awscdk.services.stepfunctions.JsonPath.stringAt("States.Format('fraud-detection-{}', $.executionId)"))
+            .trainingJobName(software.amazon.awscdk.services.stepfunctions.JsonPath.stringAt("States.Format('fraud-detection-{}', $$.Execution.Name)"))
             .role(sageMakerExecutionRole)
             .algorithmSpecification(software.amazon.awscdk.services.stepfunctions.tasks.AlgorithmSpecification.builder()
                 .trainingImage(software.amazon.awscdk.services.stepfunctions.tasks.DockerImage.fromRegistry("683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-xgboost:1.7-1"))
