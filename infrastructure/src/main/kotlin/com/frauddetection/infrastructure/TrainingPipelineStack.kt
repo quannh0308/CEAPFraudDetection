@@ -535,6 +535,30 @@ class TrainingPipelineStack(
         // Grant S3 permissions to workflow execution role
         workflowBucket.grantReadWrite(trainingWorkflow)
         
+        // Grant SageMaker permissions to workflow execution role
+        trainingWorkflow.addToRolePolicy(
+            PolicyStatement.Builder.create()
+                .effect(Effect.ALLOW)
+                .actions(listOf(
+                    "sagemaker:CreateTrainingJob",
+                    "sagemaker:DescribeTrainingJob",
+                    "sagemaker:StopTrainingJob",
+                    "sagemaker:AddTags",
+                    "sagemaker:ListTags"
+                ))
+                .resources(listOf("*"))
+                .build()
+        )
+        
+        // Grant PassRole permission for SageMaker execution role
+        trainingWorkflow.addToRolePolicy(
+            PolicyStatement.Builder.create()
+                .effect(Effect.ALLOW)
+                .actions(listOf("iam:PassRole"))
+                .resources(listOf(sageMakerExecutionRole.roleArn))
+                .build()
+        )
+        
         // ========================================
         // EventBridge Schedule
         // ========================================
