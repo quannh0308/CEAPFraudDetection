@@ -465,6 +465,12 @@ class TrainingPipelineStack(
         // Evaluate Task (Lambda)
         val evaluateTask = LambdaInvoke.Builder.create(this, "EvaluateTask")
             .lambdaFunction(evaluateHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "EvaluateStage",
+                "previousStage" to "TrainStage",
+                "workflowBucket" to workflowBucket.bucketName
+            )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
             .build()
@@ -490,6 +496,12 @@ class TrainingPipelineStack(
         // Deploy Task (Lambda)
         val deployTask = LambdaInvoke.Builder.create(this, "DeployTask")
             .lambdaFunction(deployHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "DeployStage",
+                "previousStage" to "EvaluateStage",
+                "workflowBucket" to workflowBucket.bucketName
+            )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
             .build()
