@@ -287,6 +287,12 @@ class InferencePipelineStack(
         // Score Task (Lambda)
         val scoreTask = LambdaInvoke.Builder.create(this, "ScoreTask")
             .lambdaFunction(scoreHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "ScoreStage",
+                "workflowBucket" to workflowBucketName,
+                "initialData.$" to "$"
+            )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
             .build()
@@ -312,6 +318,12 @@ class InferencePipelineStack(
         // Store Task (Lambda)
         val storeTask = LambdaInvoke.Builder.create(this, "StoreTask")
             .lambdaFunction(storeHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "StoreStage",
+                "previousStage" to "ScoreStage",
+                "workflowBucket" to workflowBucketName
+            )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
             .build()
@@ -337,6 +349,12 @@ class InferencePipelineStack(
         // Alert Task (Lambda)
         val alertTask = LambdaInvoke.Builder.create(this, "AlertTask")
             .lambdaFunction(alertHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "AlertStage",
+                "previousStage" to "ScoreStage",
+                "workflowBucket" to workflowBucketName
+            )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
             .build()
@@ -362,6 +380,12 @@ class InferencePipelineStack(
         // Monitor Task (Lambda)
         val monitorTask = LambdaInvoke.Builder.create(this, "MonitorTask")
             .lambdaFunction(monitorHandler)
+            .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
+                "executionId.$" to "$$.Execution.Name",
+                "currentStage" to "MonitorStage",
+                "previousStage" to "StoreStage",
+                "workflowBucket" to workflowBucketName
+            )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
             .build()
