@@ -151,8 +151,9 @@ open class DeployHandler(
             )
             logger.info("Endpoint $endpointName already exists, will update")
             true
-        } catch (e: ResourceNotFoundException) {
-            logger.info("Endpoint $endpointName does not exist, will create")
+        } catch (e: Exception) {
+            // Endpoint doesn't exist (ResourceNotFoundException or similar)
+            logger.info("Endpoint $endpointName does not exist, will create. Error: ${e.message}")
             false
         }
         
