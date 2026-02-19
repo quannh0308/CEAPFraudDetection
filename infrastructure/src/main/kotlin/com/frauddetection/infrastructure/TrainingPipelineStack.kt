@@ -468,7 +468,6 @@ class TrainingPipelineStack(
             .payload(software.amazon.awscdk.services.stepfunctions.TaskInput.fromObject(mapOf(
                 "executionId.$" to "$$.Execution.Name",
                 "currentStage" to "EvaluateStage",
-                "previousStage" to "TrainStage",
                 "workflowBucket" to workflowBucket.bucketName,
                 "initialData" to mapOf(
                     "modelArtifactPath.$" to "$.trainingResult.ModelArtifacts.S3ModelArtifacts",
