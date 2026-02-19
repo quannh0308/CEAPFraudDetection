@@ -402,6 +402,14 @@ class InferencePipelineStack(
             .stateMachineType(StateMachineType.EXPRESS)
             .definitionBody(DefinitionBody.fromChainable(definition))
             .timeout(Duration.minutes(30))
+            .logs(software.amazon.awscdk.services.stepfunctions.LogOptions.builder()
+                .destination(software.amazon.awscdk.services.logs.LogGroup.Builder.create(this, "InferenceWorkflowLogGroup")
+                    .logGroupName("/aws/stepfunctions/FraudDetectionInference-$envName")
+                    .retention(RetentionDays.ONE_WEEK)
+                    .build())
+                .level(software.amazon.awscdk.services.stepfunctions.LogLevel.ALL)
+                .includeExecutionData(true)
+                .build())
             .build()
         
         // Grant S3 permissions to workflow execution role
