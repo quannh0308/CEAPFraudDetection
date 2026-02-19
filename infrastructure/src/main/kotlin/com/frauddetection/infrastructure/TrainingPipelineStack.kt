@@ -469,7 +469,11 @@ class TrainingPipelineStack(
                 "executionId.$" to "$$.Execution.Name",
                 "currentStage" to "EvaluateStage",
                 "previousStage" to "TrainStage",
-                "workflowBucket" to workflowBucket.bucketName
+                "workflowBucket" to workflowBucket.bucketName,
+                "initialData" to mapOf(
+                    "modelArtifactPath.$" to "$.trainingResult.ModelArtifacts.S3ModelArtifacts",
+                    "testDataPath.$" to "States.Format('{}test.parquet', $.outputPrefix)"
+                )
             )))
             .outputPath("$.Payload")
             .retryOnServiceExceptions(true)
