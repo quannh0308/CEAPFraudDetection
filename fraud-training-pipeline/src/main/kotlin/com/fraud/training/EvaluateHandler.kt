@@ -357,18 +357,21 @@ open class EvaluateHandler(
      * @return Fraud score (0.0 to 1.0)
      */
     private fun invokeEndpoint(endpointName: String, features: Map<String, Double>): Double {
-        val payload = objectMapper.writeValueAsString(features)
+        // Convert features to CSV format (comma-separated values, no header)
+        // XGBoost expects: value1,value2,value3,...
+        val payload = features.values.joinToString(",")
         
         val response = sageMakerRuntimeClient.invokeEndpoint(
             InvokeEndpointRequest.builder()
                 .endpointName(endpointName)
-                .contentType("application/json")
+                .contentType("text/csv")
                 .body(SdkBytes.fromUtf8String(payload))
                 .build()
         )
         
-        val prediction = objectMapper.readTree(response.body().asUtf8String())
-        return prediction.asDouble()
+        // Response is a single number (fraud score)
+        val prediction = response.body().asUtf8String().trim().toDouble()
+        return prediction
     }
     
     /**
