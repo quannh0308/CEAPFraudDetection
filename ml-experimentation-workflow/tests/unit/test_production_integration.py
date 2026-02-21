@@ -453,3 +453,326 @@ class TestProductionIntegrator:
 
         logged_params = tracker.log_parameters.call_args[0][1]
         assert 'source_experiment_id' not in logged_params
+
+
+class TestConfigurationFileManagement:
+    """Test suite for configuration file generation, validation, and S3 writes."""
+
+    @pytest.fixture
+    def mock_boto3_clients(self):
+        """Create mock boto3 clients for SSM, S3, and Step Functions."""
+        with patch('production_integration.boto3.client') as mock_client:
+            mock_ssm = MagicMock()
+            mock_s3 = MagicMock()
+            mock_sfn = MagicMock()
+
+            mock_ssm.exceptions.ParameterNotFound = type(
+                'ParameterNotFound', (Exception,), {}
+            )
+            mock_s3.exceptions.NoSuchKey = type(
+                'NoSuchKey', (Exception,), {}
+            )
+
+            def client_factory(service_name, **kwargs):
+                if service_name == 'ssm':
+                    return mock_ssm
+                elif service_name == 's3':
+                    return mock_s3
+                elif service_name == 'stepfunctions':
+                    return mock_sfn
+                return MagicMock()
+
+            mock_client.side_effect = client_factory
+            yield {'ssm': mock_ssm, 's3': mock_s3, 'sfn': mock_sfn}
+
+    @pytest.fixture
+    def integrator(self, mock_boto3_clients):
+        """Create ProductionIntegrator instance with mocked dependencies."""
+        return ProductionIntegrator()
+
+    @pytest.fixture
+    def sample_hyperparameters(self):
+        """Sample hyperparameters for config generation."""
+        return {
+            'objective': 'binary:logistic',
+            'num_round': 150,
+            'max_depth': 7,
+            'eta': 0.15,
+            'subsample': 0.8,
+            'colsample_bytree': 0.8,
+        }
+
+    @pytest.fixture
+    def sample_metrics(self):
+        """Sample performance metrics for config generation."""
+        return {
+            'accuracy': 0.961,
+            'precision': 0.92,
+            'recall': 0.88,
+            'f1_score': 0.90,
+            'auc_roc': 0.95,
+        }
+
+    @pytest.fixture
+    def valid_config(self, integrator, sample_hyperparameters, sample_metrics):
+        """Generate a valid production config."""
+        return integrator.generate_production_config(
+            experiment_id='exp-20240115-001',
+            hyperparameters=sample_hyperparameters,
+            metrics=sample_metrics,
+            approver='data-science-team',
+        )
+
+    # --- generate_production_config tests ---
+
+    def test_generate_config_returns_dict_with_model_key(
+        self, integrator, sample_hyperparameters, sample_metrics
+    ):
+        """Test generated config has top-level 'model' key."""
+        config = integrator.generate_production_config(
+            experiment_id='exp-001',
+            hyperparameters=sample_hyperparameters,
+            metrics=sample_metrics,
+            approver='approver-name',
+        )
+        assert 'model' in config
+        assert isinstance(config['model'], dict)
+
+    def test_generate_config_includes_algorithm(
+        self, integrator, sample_hyperparameters, sample_metrics
+    ):
+        """Test generated config includes algorithm field set to 'xgboost'."""
+        config = integrator.generate_production_config(
+            experiment_id='exp-001',
+            hyperparameters=sample_hyperparameters,
+            metrics=sample_metrics,
+            approver='approver-name',
+        )
+        assert config['model']['algorithm'] == 'xgboost'
+
+    def test_generate_config_includes_version(
+        self, integrator, sample_hyperparameters, sample_metrics
+    ):
+        """Test generated config includes version matching experiment_id."""
+        config = integrator.generate_production_config(
+            experiment_id='exp-20240115-001',
+            hyperparameters=sample_hyperparameters,
+            metrics=sample_metrics,
+            approver='approver-name',
+        )
+        assert config['model']['version'] == 'exp-20240115-001'
+
+    def test_generate_config_includes_hyperparameters(
+        self, integrator, sample_hyperparameters, sample_metrics
+    ):
+        """Test generated config includes hyperparameters dict."""
+        config = integrator.generate_production_config(
+            experiment_id='exp-001',
+            hyperparameters=sample_hyperparameters,
+            metrics=sample_metrics,
+            approver='approver-name',
+        )
+        assert config['model']['hyperparameters'] == sample_hyperparameters
+
+    def test_generate_config_includes_performance(
+        self, integrator, sample_hyperparameters, sample_metrics
+    ):
+        """Test generated config includes performance metrics."""
+        config = integrator.generate_production_config(
+            experiment_id='exp-001',
+            hyperparameters=sample_hyperparameters,
+            metrics=sample_metrics,
+            approver='approver-name',
+        )
+        assert config['model']['performance'] == sample_metrics
+
+    def test_generate_config_includes_tested_date(
+        self, integrator, sample_hyperparameters, sample_metrics
+    ):
+        """Test generated config includes tested_date in YYYY-MM-DD format."""
+        config = integrator.generate_production_config(
+            experiment_id='exp-001',
+            hyperparameters=sample_hyperparameters,
+            metrics=sample_metrics,
+            approver='approver-name',
+        )
+        tested_date = config['model']['tested_date']
+        assert isinstance(tested_date, str)
+        # Verify date format YYYY-MM-DD
+        datetime.strptime(tested_date, '%Y-%m-%d')
+
+    def test_generate_config_includes_approved_by(
+        self, integrator, sample_hyperparameters, sample_metrics
+    ):
+        """Test generated config includes approved_by field."""
+        config = integrator.generate_production_config(
+            experiment_id='exp-001',
+            hyperparameters=sample_hyperparameters,
+            metrics=sample_metrics,
+            approver='data-science-team',
+        )
+        assert config['model']['approved_by'] == 'data-science-team'
+
+    # --- validate_config_schema tests ---
+
+    def test_validate_valid_config(self, integrator, valid_config):
+        """Test valid config passes validation."""
+        assert integrator.validate_config_schema(valid_config) is True
+
+    def test_validate_missing_model_key(self, integrator):
+        """Test config without 'model' key raises ValueError."""
+        with pytest.raises(ValueError, match="missing required top-level 'model' key"):
+            integrator.validate_config_schema({'not_model': {}})
+
+    def test_validate_missing_algorithm(self, integrator, valid_config):
+        """Test config missing 'algorithm' raises ValueError."""
+        del valid_config['model']['algorithm']
+        with pytest.raises(ValueError, match="algorithm"):
+            integrator.validate_config_schema(valid_config)
+
+    def test_validate_missing_hyperparameters(self, integrator, valid_config):
+        """Test config missing 'hyperparameters' raises ValueError."""
+        del valid_config['model']['hyperparameters']
+        with pytest.raises(ValueError, match="hyperparameters"):
+            integrator.validate_config_schema(valid_config)
+
+    def test_validate_missing_performance(self, integrator, valid_config):
+        """Test config missing 'performance' raises ValueError."""
+        del valid_config['model']['performance']
+        with pytest.raises(ValueError, match="performance"):
+            integrator.validate_config_schema(valid_config)
+
+    def test_validate_missing_tested_date(self, integrator, valid_config):
+        """Test config missing 'tested_date' raises ValueError."""
+        del valid_config['model']['tested_date']
+        with pytest.raises(ValueError, match="tested_date"):
+            integrator.validate_config_schema(valid_config)
+
+    def test_validate_missing_approved_by(self, integrator, valid_config):
+        """Test config missing 'approved_by' raises ValueError."""
+        del valid_config['model']['approved_by']
+        with pytest.raises(ValueError, match="approved_by"):
+            integrator.validate_config_schema(valid_config)
+
+    def test_validate_wrong_type_algorithm(self, integrator, valid_config):
+        """Test config with non-string algorithm raises ValueError."""
+        valid_config['model']['algorithm'] = 123
+        with pytest.raises(ValueError, match="must be str"):
+            integrator.validate_config_schema(valid_config)
+
+    def test_validate_wrong_type_hyperparameters(self, integrator, valid_config):
+        """Test config with non-dict hyperparameters raises ValueError."""
+        valid_config['model']['hyperparameters'] = 'not_a_dict'
+        with pytest.raises(ValueError, match="must be dict"):
+            integrator.validate_config_schema(valid_config)
+
+    def test_validate_wrong_type_performance(self, integrator, valid_config):
+        """Test config with non-dict performance raises ValueError."""
+        valid_config['model']['performance'] = [0.95]
+        with pytest.raises(ValueError, match="must be dict"):
+            integrator.validate_config_schema(valid_config)
+
+    def test_validate_wrong_type_tested_date(self, integrator, valid_config):
+        """Test config with non-string tested_date raises ValueError."""
+        valid_config['model']['tested_date'] = 20240115
+        with pytest.raises(ValueError, match="must be str"):
+            integrator.validate_config_schema(valid_config)
+
+    def test_validate_wrong_type_approved_by(self, integrator, valid_config):
+        """Test config with non-string approved_by raises ValueError."""
+        valid_config['model']['approved_by'] = ['team']
+        with pytest.raises(ValueError, match="must be str"):
+            integrator.validate_config_schema(valid_config)
+
+    # --- write_config_to_s3 tests ---
+
+    def test_write_config_writes_yaml_to_s3(
+        self, integrator, mock_boto3_clients, valid_config
+    ):
+        """Test writes config as YAML to production-model-config.yaml."""
+        mock_s3 = mock_boto3_clients['s3']
+        mock_s3.get_object.side_effect = mock_s3.exceptions.NoSuchKey(
+            {'Error': {'Code': 'NoSuchKey'}}, 'GetObject'
+        )
+
+        integrator.write_config_to_s3(valid_config)
+
+        # Should write to production-model-config.yaml
+        mock_s3.put_object.assert_called_once()
+        call_kwargs = mock_s3.put_object.call_args[1]
+        assert call_kwargs['Bucket'] == 'fraud-detection-config'
+        assert call_kwargs['Key'] == 'production-model-config.yaml'
+        assert isinstance(call_kwargs['Body'], str)
+
+    def test_write_config_archives_existing_config(
+        self, integrator, mock_boto3_clients, valid_config
+    ):
+        """Test archives existing config before writing new one."""
+        mock_s3 = mock_boto3_clients['s3']
+        mock_body = MagicMock()
+        mock_body.read.return_value = b'old config content'
+        mock_s3.get_object.return_value = {'Body': mock_body}
+
+        integrator.write_config_to_s3(valid_config)
+
+        # Should have 2 put_object calls: archive + new config
+        assert mock_s3.put_object.call_count == 2
+
+        # First call should be the archive
+        archive_call = mock_s3.put_object.call_args_list[0][1]
+        assert archive_call['Bucket'] == 'fraud-detection-config'
+        assert archive_call['Key'].startswith('archive/production-model-config-')
+        assert archive_call['Key'].endswith('.yaml')
+        assert archive_call['Body'] == b'old config content'
+
+        # Second call should be the new config
+        new_call = mock_s3.put_object.call_args_list[1][1]
+        assert new_call['Key'] == 'production-model-config.yaml'
+
+    def test_write_config_skips_archive_when_no_existing(
+        self, integrator, mock_boto3_clients, valid_config
+    ):
+        """Test skips archive when no existing config in S3."""
+        mock_s3 = mock_boto3_clients['s3']
+        mock_s3.get_object.side_effect = mock_s3.exceptions.NoSuchKey(
+            {'Error': {'Code': 'NoSuchKey'}}, 'GetObject'
+        )
+
+        integrator.write_config_to_s3(valid_config)
+
+        # Only 1 put_object call (no archive)
+        assert mock_s3.put_object.call_count == 1
+        call_kwargs = mock_s3.put_object.call_args[1]
+        assert call_kwargs['Key'] == 'production-model-config.yaml'
+
+    def test_write_config_validates_schema_first(
+        self, integrator, mock_boto3_clients
+    ):
+        """Test validates schema before writing (invalid config should not write)."""
+        mock_s3 = mock_boto3_clients['s3']
+        invalid_config = {'not_model': {}}
+
+        with pytest.raises(ValueError):
+            integrator.write_config_to_s3(invalid_config)
+
+        # S3 should not have been called
+        mock_s3.get_object.assert_not_called()
+        mock_s3.put_object.assert_not_called()
+
+    def test_write_config_yaml_is_parseable(
+        self, integrator, mock_boto3_clients, valid_config
+    ):
+        """Test written YAML body can be parsed back to original config."""
+        import yaml as yaml_mod
+
+        mock_s3 = mock_boto3_clients['s3']
+        mock_s3.get_object.side_effect = mock_s3.exceptions.NoSuchKey(
+            {'Error': {'Code': 'NoSuchKey'}}, 'GetObject'
+        )
+
+        integrator.write_config_to_s3(valid_config)
+
+        written_body = mock_s3.put_object.call_args[1]['Body']
+        parsed = yaml_mod.safe_load(written_body)
+        assert parsed['model']['algorithm'] == valid_config['model']['algorithm']
+        assert parsed['model']['approved_by'] == valid_config['model']['approved_by']

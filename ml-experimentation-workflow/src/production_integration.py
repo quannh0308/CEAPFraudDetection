@@ -318,3 +318,148 @@ class ProductionIntegrator:
 
         tracker.log_parameters(promotion_exp_id, promotion_params)
         tracker.close_experiment(promotion_exp_id)
+    def generate_production_config(
+        self,
+        experiment_id: str,
+        hyperparameters: Dict[str, Any],
+        metrics: Dict[str, Any],
+        approver: str,
+    ) -> Dict[str, Any]:
+        """
+        Generate production configuration dictionary.
+
+        Creates a configuration dictionary containing model algorithm,
+        hyperparameters, performance metrics, test date, and approver
+        information suitable for writing to S3 as a YAML config file.
+
+        Args:
+            experiment_id: Unique identifier for the experiment that
+                produced the winning configuration.
+            hyperparameters: Dictionary of hyperparameter names to values.
+            metrics: Dictionary of performance metric names to values
+                (e.g. accuracy, precision, recall).
+            approver: Name or identifier of the person approving the
+                configuration for production use.
+
+        Returns:
+            A dictionary with a top-level 'model' key containing algorithm,
+            version, hyperparameters, performance, tested_date, and
+            approved_by fields.
+
+        Example:
+            integrator = ProductionIntegrator()
+            config = integrator.generate_production_config(
+                experiment_id='exp-20240115-001',
+                hyperparameters={'max_depth': 7, 'eta': 0.15},
+                metrics={'accuracy': 0.96, 'precision': 0.92},
+                approver='data-science-team',
+            )
+        """
+        config: Dict[str, Any] = {
+            'model': {
+                'algorithm': 'xgboost',
+                'version': experiment_id,
+                'hyperparameters': dict(hyperparameters),
+                'performance': dict(metrics),
+                'tested_date': datetime.now().strftime('%Y-%m-%d'),
+                'approved_by': approver,
+            }
+        }
+        return config
+    def validate_config_schema(self, config: Dict[str, Any]) -> bool:
+        """
+        Validate production configuration schema.
+
+        Checks that the configuration dictionary has the required structure:
+        a top-level 'model' key containing algorithm (str), hyperparameters
+        (dict), performance (dict), tested_date (str), and approved_by (str).
+
+        Args:
+            config: Configuration dictionary to validate.
+
+        Returns:
+            True if the schema is valid.
+
+        Raises:
+            ValueError: If the 'model' key is missing, any required field
+                is absent, or a field has an incorrect type.
+
+        Example:
+            integrator = ProductionIntegrator()
+            config = integrator.generate_production_config(...)
+            integrator.validate_config_schema(config)  # returns True
+        """
+        if 'model' not in config:
+            raise ValueError("Configuration missing required top-level 'model' key")
+
+        model = config['model']
+
+        required_fields: Dict[str, type] = {
+            'algorithm': str,
+            'hyperparameters': dict,
+            'performance': dict,
+            'tested_date': str,
+            'approved_by': str,
+        }
+
+        for field, expected_type in required_fields.items():
+            if field not in model:
+                raise ValueError(
+                    f"Configuration 'model' section missing required field: '{field}'"
+                )
+            if not isinstance(model[field], expected_type):
+                raise ValueError(
+                    f"Configuration field 'model.{field}' must be {expected_type.__name__}, "
+                    f"got {type(model[field]).__name__}"
+                )
+
+        return True
+    def write_config_to_s3(self, config: Dict[str, Any]) -> None:
+        """
+        Write production configuration to S3.
+
+        Validates the configuration schema, archives the current production
+        config (if one exists), and writes the new config as YAML to
+        ``s3://fraud-detection-config/production-model-config.yaml``.
+
+        Args:
+            config: Configuration dictionary to write. Must pass
+                :meth:`validate_config_schema` validation.
+
+        Raises:
+            ValueError: If the configuration fails schema validation.
+
+        Example:
+            integrator = ProductionIntegrator()
+            config = integrator.generate_production_config(
+                experiment_id='exp-001',
+                hyperparameters={'max_depth': 7},
+                metrics={'accuracy': 0.96},
+                approver='team-lead',
+            )
+            integrator.write_config_to_s3(config)
+        """
+        # Validate schema first
+        self.validate_config_schema(config)
+
+        # Archive current config if it exists
+        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        try:
+            current_config = self.s3_client.get_object(
+                Bucket=self.config_bucket,
+                Key='production-model-config.yaml',
+            )
+            self.s3_client.put_object(
+                Bucket=self.config_bucket,
+                Key=f'archive/production-model-config-{timestamp}.yaml',
+                Body=current_config['Body'].read(),
+            )
+        except self.s3_client.exceptions.NoSuchKey:
+            pass  # No existing config to archive
+
+        # Write new config
+        self.s3_client.put_object(
+            Bucket=self.config_bucket,
+            Key='production-model-config.yaml',
+            Body=yaml.dump(config),
+        )
