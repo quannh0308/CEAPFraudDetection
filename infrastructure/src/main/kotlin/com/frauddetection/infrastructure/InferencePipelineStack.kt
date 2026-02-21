@@ -274,6 +274,7 @@ class InferencePipelineStack(
                 "ENVIRONMENT" to envName,
                 "WORKFLOW_BUCKET" to workflowBucketName,
                 "MONITORING_ALERT_TOPIC_ARN" to monitoringTopic.topicArn,
+                "METRICS_BUCKET" to "fraud-detection-metrics",
                 "LOG_LEVEL" to "INFO"
             ))
             .logRetention(RetentionDays.ONE_MONTH)
