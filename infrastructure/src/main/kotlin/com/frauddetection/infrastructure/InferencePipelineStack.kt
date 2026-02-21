@@ -179,6 +179,19 @@ class InferencePipelineStack(
                 .build()
         )
         
+        // Grant s3:ListBucket on bucket-level ARNs (required by S3 SDK for object existence checks)
+        scoreHandler.addToRolePolicy(
+            PolicyStatement.Builder.create()
+                .effect(Effect.ALLOW)
+                .actions(listOf("s3:ListBucket"))
+                .resources(listOf(
+                    "arn:aws:s3:::$workflowBucketName",
+                    "arn:aws:s3:::$configBucketName",
+                    "arn:aws:s3:::$dataBucketName"
+                ))
+                .build()
+        )
+        
         scoreHandler.addToRolePolicy(
             PolicyStatement.Builder.create()
                 .effect(Effect.ALLOW)
@@ -198,7 +211,7 @@ class InferencePipelineStack(
             .environment(mapOf(
                 "ENVIRONMENT" to envName,
                 "WORKFLOW_BUCKET" to workflowBucketName,
-                "FRAUD_SCORES_TABLE" to fraudScoresTable.tableName,
+                "DYNAMODB_TABLE" to fraudScoresTable.tableName,
                 "LOG_LEVEL" to "INFO"
             ))
             .logRetention(RetentionDays.ONE_MONTH)
@@ -229,7 +242,7 @@ class InferencePipelineStack(
             .environment(mapOf(
                 "ENVIRONMENT" to envName,
                 "WORKFLOW_BUCKET" to workflowBucketName,
-                "ALERT_TOPIC_ARN" to alertTopic.topicArn,
+                "FRAUD_ALERT_TOPIC_ARN" to alertTopic.topicArn,
                 "LOG_LEVEL" to "INFO"
             ))
             .logRetention(RetentionDays.ONE_MONTH)
@@ -260,7 +273,7 @@ class InferencePipelineStack(
             .environment(mapOf(
                 "ENVIRONMENT" to envName,
                 "WORKFLOW_BUCKET" to workflowBucketName,
-                "MONITORING_TOPIC_ARN" to monitoringTopic.topicArn,
+                "MONITORING_ALERT_TOPIC_ARN" to monitoringTopic.topicArn,
                 "LOG_LEVEL" to "INFO"
             ))
             .logRetention(RetentionDays.ONE_MONTH)
@@ -275,6 +288,22 @@ class InferencePipelineStack(
                     "s3:PutObject"
                 ))
                 .resources(listOf("arn:aws:s3:::$workflowBucketName/*"))
+                .build()
+        )
+        
+        // Grant permissions to Monitor Handler for metrics bucket
+        monitorHandler.addToRolePolicy(
+            PolicyStatement.Builder.create()
+                .effect(Effect.ALLOW)
+                .actions(listOf(
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:ListBucket"
+                ))
+                .resources(listOf(
+                    "arn:aws:s3:::fraud-detection-metrics",
+                    "arn:aws:s3:::fraud-detection-metrics/*"
+                ))
                 .build()
         )
         

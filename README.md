@@ -227,6 +227,17 @@ The training pipeline uses a Standard workflow with Glue and Lambda stages.
 
 > **Note:** The Glue job (`fraud-detection-data-prep`) is still created but deprecated. The workflow now uses the Lambda-based DataPrepHandler.
 
+### Manual Prerequisites (Before Inference Pipeline)
+
+The following resources are NOT managed by CDK and must be created manually:
+
+```bash
+# Create metrics bucket (used by MonitorHandler for drift detection)
+aws s3 mb s3://fraud-detection-metrics --region us-east-1
+```
+
+**Important:** Without this bucket, the MonitorStage will fail with `NoSuchBucketException`.
+
 ### Inference Pipeline Deployment
 
 The inference pipeline uses an Express workflow with all Lambda stages.
@@ -246,7 +257,7 @@ The inference pipeline uses an Express workflow with all Lambda stages.
 - Lambda functions: `fraud-detection-score-handler`, `fraud-detection-store-handler`, `fraud-detection-alert-handler`, `fraud-detection-monitor-handler`
 - DynamoDB table: `FraudScores` (with `BatchDateIndex` GSI)
 - SNS topics: `fraud-detection-alerts`, `fraud-detection-monitoring`
-- S3 bucket: `fraud-detection-metrics`
+- **Note:** The `fraud-detection-metrics` S3 bucket is NOT created by CDK. You must create it manually before deployment (see Prerequisites below).
 - EventBridge rule: Daily trigger (1 AM)
 
 ### Manual Workflow Execution
@@ -275,7 +286,11 @@ aws stepfunctions describe-execution \
 ```bash
 # Prepare daily transaction batch
 aws s3 cp daily-transactions.json s3://fraud-detection-data-quannh0308-20260214/daily-batches/2024-01-15.json
+```
 
+> **Important:** The transaction batch must be a JSON array of `Transaction` objects. Each object must have: `id` (string), `timestamp` (long), `amount` (double), `merchantCategory` (string), `features` (map of string to double with keys Time, V1-V28, Amount). See `examples/transaction-batch.json` for the correct format.
+
+```bash
 # Start inference workflow
 aws stepfunctions start-execution \
   --state-machine-arn arn:aws:states:us-east-1:{account-id}:stateMachine:FraudDetectionInferenceWorkflow \
@@ -361,14 +376,14 @@ Query scored transactions:
 ```bash
 # Get all transactions for a specific date
 aws dynamodb query \
-  --table-name FraudScores \
+  --table-name FraudScores-dev \
   --index-name BatchDateIndex \
   --key-condition-expression "batchDate = :date" \
   --expression-attribute-values '{":date":{"S":"2024-01-15"}}'
 
 # Get high-risk transactions for a date
 aws dynamodb query \
-  --table-name FraudScores \
+  --table-name FraudScores-dev \
   --index-name BatchDateIndex \
   --key-condition-expression "batchDate = :date AND fraudScore >= :threshold" \
   --expression-attribute-values '{":date":{"S":"2024-01-15"},":threshold":{"N":"0.8"}}'
@@ -474,6 +489,8 @@ cat 2024-01-15.json | jq '.'
    }
    ```
 
+**Common Cause:** Missing `s3:ListBucket` permission. The S3 SDK requires `s3:ListBucket` at the bucket-level ARN (without `/*` suffix) in addition to `s3:GetObject`/`s3:PutObject` at the object-level ARN. Without it, the SDK returns 403 instead of 404 for missing objects.
+
 #### Issue: Previous stage output missing (404)
 
 **Cause**: Previous workflow stage failed or S3 path incorrect
@@ -493,6 +510,23 @@ cat 2024-01-15.json | jq '.'
 2. Increase timeout in CDK stack (max: 15 minutes)
 3. Optimize handler logic (batch processing, parallel execution)
 4. For long-running tasks, consider Step Functions wait states
+
+## Known Deployment Gotchas
+
+Issues discovered during first-time deployment that new engineers should be aware of:
+
+| Issue | Symptom | Fix Applied |
+|-------|---------|-------------|
+| Missing `s3:ListBucket` | ScoreHandler 403 on S3 GetObject | Added bucket-level ARN policy in CDK |
+| Wrong SageMaker content type | ScoreHandler 415 Unsupported Media Type | Changed from `application/json` to `text/csv` |
+| Env var mismatch (AlertHandler) | `FRAUD_ALERT_TOPIC_ARN` not found | CDK key corrected to match handler code |
+| Env var mismatch (MonitorHandler) | `MONITORING_ALERT_TOPIC_ARN` not found | CDK key corrected to match handler code |
+| Env var mismatch (StoreHandler) | `DYNAMODB_TABLE` not found, DDB writes fail silently | CDK key corrected to match handler code |
+| Missing metrics bucket | MonitorHandler `NoSuchBucketException` | Manual `aws s3 mb` required (not in CDK) |
+| Missing metrics bucket permissions | MonitorHandler 403 on metrics bucket | Added S3 policy for `fraud-detection-metrics` |
+| Bad example data | `examples/transaction-batch.json` had comment object | Removed non-Transaction JSON object from array |
+
+These fixes are tracked in `.kiro/steering/infrastructure-prerequisites.md` for ongoing reference.
 
 ## Cost Estimation
 

@@ -244,18 +244,20 @@ open class ScoreHandler(
      */
     private fun invokeEndpoint(endpointName: String, features: Map<String, Double>): Double {
         try {
-            val payload = objectMapper.writeValueAsString(features)
+            // Convert features to CSV format (comma-separated values, no header)
+            // XGBoost expects: value1,value2,value3,...
+            val payload = features.values.joinToString(",")
             
             val response = sageMakerRuntimeClient.invokeEndpoint(
                 InvokeEndpointRequest.builder()
                     .endpointName(endpointName)
-                    .contentType("application/json")
+                    .contentType("text/csv")
                     .body(SdkBytes.fromUtf8String(payload))
                     .build()
             )
             
-            val prediction = objectMapper.readTree(response.body().asUtf8String())
-            val fraudScore = prediction.asDouble()
+            // Response is a single number (fraud score)
+            val fraudScore = response.body().asUtf8String().trim().toDouble()
             
             // Validate fraud score is in valid range
             if (fraudScore < 0.0 || fraudScore > 1.0) {

@@ -1,9 +1,5 @@
 [
   {
-    "comment": "Example transaction batch for inference pipeline",
-    "description": "This file shows the format of daily transaction batches that are scored by the inference pipeline"
-  },
-  {
     "id": "txn-001",
     "timestamp": 1705334400000,
     "amount": 149.62,

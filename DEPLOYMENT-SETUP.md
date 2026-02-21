@@ -100,7 +100,14 @@ chmod +x deploy-training-pipeline.sh
 ```bash
 # Make deployment script executable
 chmod +x deploy-inference-pipeline.sh
+```
 
+**Important:** Before deploying, create the metrics bucket (not managed by CDK):
+```bash
+aws s3 mb s3://fraud-detection-metrics --region us-east-1
+```
+
+```bash
 # Deploy
 ./deploy-inference-pipeline.sh
 ```
