@@ -19,6 +19,7 @@ A production-ready fraud detection system demonstrating the CEAP (Customer Engag
 - [Monitoring and Operations](#monitoring-and-operations)
 - [Troubleshooting](#troubleshooting)
 - [Cost Estimation](#cost-estimation)
+- [ML Experimentation Workflow](#ml-experimentation-workflow)
 
 ## Architecture Overview
 
@@ -564,6 +565,51 @@ These fixes are tracked in `.kiro/steering/infrastructure-prerequisites.md` for 
 
 ---
 
+## ML Experimentation Workflow
+
+A Python-based experimentation toolkit for data scientists to explore, tune, and evaluate fraud detection models in SageMaker Studio. It provides structured experiment tracking, hyperparameter tuning (grid, random, Bayesian), algorithm comparison, feature engineering, and a promotion path to push winning configurations into the production pipeline.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   SageMaker Studio                          │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
+│  │  Experiment   │  │ Hyperparameter│  │    Algorithm     │  │
+│  │  Tracking     │  │   Tuning      │  │   Comparison     │  │
+│  └──────┬───────┘  └──────┬───────┘  └───────┬──────────┘  │
+│         │                 │                   │             │
+│  ┌──────┴───────┐  ┌──────┴───────┐          │             │
+│  │   Feature     │  │    Model     │←─────────┘             │
+│  │ Engineering   │  │  Evaluation  │                        │
+│  └──────────────┘  └──────┬───────┘                        │
+│                           │                                 │
+│                  ┌────────┴─────────┐                       │
+│                  │    Production     │                       │
+│                  │   Integration     │                       │
+│                  └────────┬─────────┘                       │
+└───────────────────────────┼─────────────────────────────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              ▼             ▼             ▼
+     ┌──────────────┐ ┌─────────┐ ┌──────────────┐
+     │  Parameter   │ │   S3    │ │Step Functions │
+     │    Store     │ │ Config  │ │  Pipeline     │
+     └──────────────┘ └─────────┘ └──────────────┘
+              │             │             │
+              └─────────────┼─────────────┘
+                            ▼
+              ┌──────────────────────────┐
+              │  Production Training     │
+              │  Pipeline (Weekly)       │
+              └──────────────────────────┘
+```
+
+When a data scientist finds a better model configuration, the Production Integration module validates the hyperparameters, backs up current values, writes new parameters to Parameter Store, generates a production config in S3, and optionally triggers the production training pipeline via Step Functions.
+
+See the [ML Experimentation Workflow README](./ml-experimentation-workflow/README.md) for setup instructions, usage examples, and module details.
+
+---
+
 ## Additional Resources
 
 - [CEAP Platform Documentation](./ceap-platform/README.md)
@@ -572,6 +618,7 @@ These fixes are tracked in `.kiro/steering/infrastructure-prerequisites.md` for 
 - [Implementation Tasks](./.kiro/specs/fraud-detection-ml-pipeline/tasks.md)
 - [AWS Step Functions Documentation](https://docs.aws.amazon.com/step-functions/)
 - [AWS SageMaker Documentation](https://docs.aws.amazon.com/sagemaker/)
+- [ML Experimentation Workflow](./ml-experimentation-workflow/README.md)
 - [Kaggle Credit Card Fraud Dataset](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)
 
 ## License
