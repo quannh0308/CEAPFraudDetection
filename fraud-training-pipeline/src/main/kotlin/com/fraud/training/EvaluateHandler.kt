@@ -270,6 +270,7 @@ open class EvaluateHandler(
      */
     private fun loadSingleParquetFile(bucket: String, key: String): List<TestRecord> {
         val tempFile = File.createTempFile("test-data-", ".parquet")
+        tempFile.delete()  // Delete so S3 SDK can create it with CREATE_NEW
         tempFile.deleteOnExit()
         
         val getObjectRequest = software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
