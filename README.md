@@ -47,7 +47,7 @@ The system consists of three interconnected ML flows that form a complete model 
 
 **How the flows connect:**
 1. **Experiment → Training:** Data scientists use the Experiment Flow to find optimal hyperparameters and model configurations. When satisfied, they promote the winning config to Parameter Store (`/fraud-detection/hyperparameters/*`) and S3 (`s3://fraud-detection-config/production-model-config.yaml`), optionally triggering the Training Flow via Step Functions.
-2. **Training → Inference:** The Training Flow picks up the promoted configuration, trains a new model, evaluates it, and deploys it to a SageMaker endpoint. The Inference Flow uses that endpoint to score daily transactions.
+2. **Training → Inference:** The Training Flow's TrainHandler reads hyperparameters from Parameter Store at runtime (with hardcoded defaults as fallback), trains a new model with those values, evaluates it, and deploys it to a SageMaker endpoint. The Inference Flow uses that endpoint to score daily transactions.
 
 ### Experiment Flow (SageMaker Studio)
 
@@ -121,7 +121,7 @@ Trains fraud detection models on historical transaction data and deploys them to
 
 **Stages:**
 1. **DataPrepStage** (Lambda): Loads Kaggle Credit Card Fraud dataset, splits into train/validation/test (70/15/15), writes CSV files
-2. **TrainStage** (Lambda): Configures and launches SageMaker XGBoost training job
+2. **TrainStage** (Lambda): Reads hyperparameters from Parameter Store (`/fraud-detection/hyperparameters/*`), configures and launches SageMaker XGBoost training job with those values (falls back to defaults if Parameter Store is empty)
 3. **EvaluateStage** (Lambda): Creates temporary endpoint, evaluates model on test data, validates accuracy >= 0.90
 4. **DeployStage** (Lambda): Deploys model to production endpoint, performs health check
 
@@ -194,7 +194,7 @@ Located in `ml-experimentation-workflow/infrastructure/`:
 All handlers extend the CEAP `WorkflowLambdaHandler` base class:
 
 - **DataPrepHandler**: Loads CSV dataset, splits into train/validation/test, writes to S3
-- **TrainHandler**: Orchestrates SageMaker training jobs
+- **TrainHandler**: Reads hyperparameters from Parameter Store, orchestrates SageMaker training jobs
 - **EvaluateHandler**: Evaluates model performance on test data
 - **DeployHandler**: Deploys models to production endpoints
 - **ScoreHandler**: Scores transactions using SageMaker endpoints
@@ -220,7 +220,7 @@ All handlers extend the CEAP `WorkflowLambdaHandler` base class:
 - **SNS**: Alerting and notifications
 - **EventBridge**: Scheduled workflow triggers
 - **CloudWatch**: Logging, metrics, and alarms
-- **Systems Manager Parameter Store**: Hyperparameter promotion from experimentation to production
+- **Systems Manager Parameter Store**: Hyperparameter storage and promotion — experimentation writes optimized values, TrainHandler reads them at runtime
 
 ## Prerequisites
 
