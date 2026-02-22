@@ -18,7 +18,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../src'))
 sys.modules['sagemaker'] = MagicMock()
 sys.modules['sagemaker.experiments'] = MagicMock()
 
-from production_integration import ProductionIntegrator, PARAM_PATHS, REQUIRED_PARAMS
+from production_integration import (
+    ProductionIntegrator,
+    PARAM_PATHS,
+    REQUIRED_PARAMS,
+    S3AccessError,
+    ParameterStoreError,
+    SageMakerTrainingError,
+    handle_sagemaker_training_error,
+)
 
 
 class TestProductionIntegrator:
@@ -1017,3 +1025,275 @@ class TestPipelineTrigger:
         assert event['metrics'] == sample_metrics
         assert 'timestamp' in event
         assert 'backup_key' in event
+
+
+class TestErrorHandlingAndRollback:
+    """Test suite for error handling and rollback utilities.
+
+    Validates: Requirements 14.2, 14.3, 14.4
+    """
+
+    @pytest.fixture
+    def mock_boto3_clients(self):
+        """Create mock boto3 clients for SSM, S3, and Step Functions."""
+        with patch('production_integration.boto3.client') as mock_client:
+            mock_ssm = MagicMock()
+            mock_s3 = MagicMock()
+            mock_sfn = MagicMock()
+
+            mock_ssm.exceptions.ParameterNotFound = type(
+                'ParameterNotFound', (Exception,), {}
+            )
+
+            # Set up NoSuchKey exception on the S3 mock
+            mock_s3.exceptions.NoSuchKey = type(
+                'NoSuchKey', (Exception,), {}
+            )
+
+            def client_factory(service_name, **kwargs):
+                if service_name == 'ssm':
+                    return mock_ssm
+                elif service_name == 's3':
+                    return mock_s3
+                elif service_name == 'stepfunctions':
+                    return mock_sfn
+                return MagicMock()
+
+            mock_client.side_effect = client_factory
+            yield {'ssm': mock_ssm, 's3': mock_s3, 'sfn': mock_sfn}
+
+    @pytest.fixture
+    def integrator(self, mock_boto3_clients):
+        """Create ProductionIntegrator instance with mocked dependencies."""
+        return ProductionIntegrator()
+
+    # --- Parameter Store rollback tests ---
+
+    def test_rollback_parameter_store_restores_values(
+        self, integrator, mock_boto3_clients
+    ):
+        """Test that rollback reads backup from S3 and writes values to Parameter Store."""
+        mock_s3 = mock_boto3_clients['s3']
+        mock_ssm = mock_boto3_clients['ssm']
+
+        backup_data = {
+            '/fraud-detection/hyperparameters/max_depth': '5',
+            '/fraud-detection/hyperparameters/eta': '0.1',
+        }
+        import yaml as _yaml
+        mock_body = MagicMock()
+        mock_body.read.return_value = _yaml.dump(backup_data).encode()
+        mock_s3.get_object.return_value = {'Body': mock_body}
+
+        result = integrator.rollback_parameter_store(
+            'parameter-store-backups/backup-20240115-120000.yaml'
+        )
+
+        assert result == backup_data
+        assert mock_ssm.put_parameter.call_count == 2
+        mock_ssm.put_parameter.assert_any_call(
+            Name='/fraud-detection/hyperparameters/max_depth',
+            Value='5',
+            Type='String',
+            Overwrite=True,
+        )
+        mock_ssm.put_parameter.assert_any_call(
+            Name='/fraud-detection/hyperparameters/eta',
+            Value='0.1',
+            Type='String',
+            Overwrite=True,
+        )
+
+    def test_rollback_parameter_store_skips_none_values(
+        self, integrator, mock_boto3_clients
+    ):
+        """Test that rollback skips parameters that were None in the backup."""
+        mock_s3 = mock_boto3_clients['s3']
+        mock_ssm = mock_boto3_clients['ssm']
+
+        backup_data = {
+            '/fraud-detection/hyperparameters/max_depth': '5',
+            '/fraud-detection/hyperparameters/eta': None,
+        }
+        import yaml as _yaml
+        mock_body = MagicMock()
+        mock_body.read.return_value = _yaml.dump(backup_data).encode()
+        mock_s3.get_object.return_value = {'Body': mock_body}
+
+        integrator.rollback_parameter_store(
+            'parameter-store-backups/backup-20240115-120000.yaml'
+        )
+
+        # Only max_depth should be written, eta was None
+        assert mock_ssm.put_parameter.call_count == 1
+        mock_ssm.put_parameter.assert_called_once_with(
+            Name='/fraud-detection/hyperparameters/max_depth',
+            Value='5',
+            Type='String',
+            Overwrite=True,
+        )
+
+    def test_rollback_parameter_store_s3_read_failure(
+        self, integrator, mock_boto3_clients
+    ):
+        """Test that S3 read failure during rollback raises S3AccessError."""
+        mock_s3 = mock_boto3_clients['s3']
+        mock_s3.get_object.side_effect = Exception('Access Denied')
+
+        with pytest.raises(S3AccessError, match='Failed to read backup'):
+            integrator.rollback_parameter_store(
+                'parameter-store-backups/backup-20240115-120000.yaml'
+            )
+
+    def test_rollback_parameter_store_ssm_write_failure(
+        self, integrator, mock_boto3_clients
+    ):
+        """Test that SSM write failure during rollback raises ParameterStoreError."""
+        mock_s3 = mock_boto3_clients['s3']
+        mock_ssm = mock_boto3_clients['ssm']
+
+        backup_data = {
+            '/fraud-detection/hyperparameters/max_depth': '5',
+        }
+        import yaml as _yaml
+        mock_body = MagicMock()
+        mock_body.read.return_value = _yaml.dump(backup_data).encode()
+        mock_s3.get_object.return_value = {'Body': mock_body}
+        mock_ssm.put_parameter.side_effect = Exception('AccessDeniedException')
+
+        with pytest.raises(ParameterStoreError, match='Failed to restore parameter'):
+            integrator.rollback_parameter_store(
+                'parameter-store-backups/backup-20240115-120000.yaml'
+            )
+
+    # --- Config file rollback tests ---
+
+    def test_rollback_config_file_copies_backup(
+        self, integrator, mock_boto3_clients
+    ):
+        """Test that rollback copies the backup to the production config location."""
+        mock_s3 = mock_boto3_clients['s3']
+
+        integrator.rollback_config_file(
+            'archive/production-model-config-20240115-120000.yaml'
+        )
+
+        mock_s3.copy_object.assert_called_once_with(
+            Bucket='fraud-detection-config',
+            CopySource={
+                'Bucket': 'fraud-detection-config',
+                'Key': 'archive/production-model-config-20240115-120000.yaml',
+            },
+            Key='production-model-config.yaml',
+        )
+
+    def test_rollback_config_file_s3_failure(
+        self, integrator, mock_boto3_clients
+    ):
+        """Test that S3 copy failure during config rollback raises S3AccessError."""
+        mock_s3 = mock_boto3_clients['s3']
+        mock_s3.copy_object.side_effect = Exception('Access Denied')
+
+        with pytest.raises(S3AccessError, match='Failed to rollback config'):
+            integrator.rollback_config_file(
+                'archive/production-model-config-20240115-120000.yaml'
+            )
+
+    # --- S3 access error handling tests ---
+
+    def test_s3_access_error_includes_permission_info(self):
+        """Test that S3AccessError messages include permission requirements."""
+        error = S3AccessError(
+            "Failed to read from s3://bucket/key. "
+            "Ensure your IAM role has s3:GetObject permission for this bucket."
+        )
+        assert 's3:GetObject' in str(error)
+        assert 'permission' in str(error).lower()
+
+    def test_s3_access_error_is_exception(self):
+        """Test that S3AccessError is a proper Exception subclass."""
+        assert issubclass(S3AccessError, Exception)
+
+    # --- Parameter Store error handling tests ---
+
+    def test_parameter_store_error_includes_rollback_instructions(self):
+        """Test that ParameterStoreError messages include rollback instructions."""
+        error = ParameterStoreError(
+            "Failed to restore parameter '/fraud-detection/hyperparameters/max_depth' "
+            "during rollback. Error: AccessDeniedException. "
+            "Manual rollback may be required for remaining parameters."
+        )
+        assert 'rollback' in str(error).lower()
+        assert '/fraud-detection/hyperparameters/max_depth' in str(error)
+
+    def test_parameter_store_error_is_exception(self):
+        """Test that ParameterStoreError is a proper Exception subclass."""
+        assert issubclass(ParameterStoreError, Exception)
+
+    # --- SageMaker training error handling tests ---
+
+    def test_sagemaker_training_error_includes_cloudwatch_reference(self):
+        """Test that SageMakerTrainingError messages include CloudWatch log references."""
+        error = SageMakerTrainingError(
+            "Training job 'my-job' failed: AlgorithmError. "
+            "Check CloudWatch logs for details: /aws/sagemaker/TrainingJobs/my-job"
+        )
+        assert 'CloudWatch' in str(error)
+        assert '/aws/sagemaker/TrainingJobs/my-job' in str(error)
+
+    def test_sagemaker_training_error_is_exception(self):
+        """Test that SageMakerTrainingError is a proper Exception subclass."""
+        assert issubclass(SageMakerTrainingError, Exception)
+
+    def test_handle_sagemaker_training_error_raises_on_failure(self):
+        """Test that handle_sagemaker_training_error raises for failed jobs."""
+        mock_client = MagicMock()
+        mock_client.describe_training_job.return_value = {
+            'TrainingJobStatus': 'Failed',
+            'FailureReason': 'AlgorithmError: data format issue',
+        }
+
+        with pytest.raises(SageMakerTrainingError, match='AlgorithmError'):
+            handle_sagemaker_training_error(mock_client, 'my-training-job')
+
+    def test_handle_sagemaker_training_error_includes_log_group(self):
+        """Test that the error includes the CloudWatch log group path."""
+        mock_client = MagicMock()
+        mock_client.describe_training_job.return_value = {
+            'TrainingJobStatus': 'Failed',
+            'FailureReason': 'ResourceLimitExceeded',
+        }
+
+        with pytest.raises(
+            SageMakerTrainingError,
+            match='/aws/sagemaker/TrainingJobs/my-training-job',
+        ):
+            handle_sagemaker_training_error(mock_client, 'my-training-job')
+
+    def test_handle_sagemaker_training_error_no_raise_on_success(self):
+        """Test that handle_sagemaker_training_error does not raise for completed jobs."""
+        mock_client = MagicMock()
+        mock_client.describe_training_job.return_value = {
+            'TrainingJobStatus': 'Completed',
+        }
+
+        # Should not raise
+        handle_sagemaker_training_error(mock_client, 'my-training-job')
+
+    def test_handle_sagemaker_training_error_describe_failure(self):
+        """Test that describe_training_job failure raises SageMakerTrainingError."""
+        mock_client = MagicMock()
+        mock_client.describe_training_job.side_effect = Exception('ServiceUnavailable')
+
+        with pytest.raises(SageMakerTrainingError, match='Failed to describe training job'):
+            handle_sagemaker_training_error(mock_client, 'my-training-job')
+
+    def test_handle_sagemaker_training_error_unknown_failure_reason(self):
+        """Test that unknown failure reason is handled gracefully."""
+        mock_client = MagicMock()
+        mock_client.describe_training_job.return_value = {
+            'TrainingJobStatus': 'Failed',
+        }
+
+        with pytest.raises(SageMakerTrainingError, match='Unknown failure'):
+            handle_sagemaker_training_error(mock_client, 'my-training-job')

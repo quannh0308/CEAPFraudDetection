@@ -41,6 +41,78 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 
+class S3AccessError(Exception):
+    """Raised when S3 operations fail due to access or path issues.
+
+    Includes descriptive messages with permission requirements to help
+    diagnose and resolve the issue.
+
+    **Validates: Requirements 14.2**
+    """
+
+
+class ParameterStoreError(Exception):
+    """Raised when Parameter Store operations fail.
+
+    Includes error details and rollback instructions so the caller
+    can recover from partial writes.
+
+    **Validates: Requirements 14.4**
+    """
+
+
+class SageMakerTrainingError(Exception):
+    """Raised when a SageMaker training job fails.
+
+    Includes the failure reason from SageMaker and a reference to the
+    CloudWatch log group for further investigation.
+
+    **Validates: Requirements 14.3**
+    """
+
+
+def handle_sagemaker_training_error(
+    sagemaker_client: Any,
+    training_job_name: str,
+) -> None:
+    """
+    Check a SageMaker training job and raise a descriptive error if it failed.
+
+    Queries the training job status and, if the job has failed, raises a
+    :class:`SageMakerTrainingError` with the failure reason and a reference
+    to the CloudWatch log group for the job.
+
+    Args:
+        sagemaker_client: A boto3 SageMaker client.
+        training_job_name: The name of the training job to check.
+
+    Raises:
+        SageMakerTrainingError: If the training job status is ``'Failed'``.
+
+    Example:
+        import boto3
+        client = boto3.client('sagemaker')
+        handle_sagemaker_training_error(client, 'my-training-job-001')
+    """
+    try:
+        response = sagemaker_client.describe_training_job(
+            TrainingJobName=training_job_name,
+        )
+    except Exception as e:
+        raise SageMakerTrainingError(
+            f"Failed to describe training job '{training_job_name}': {e}"
+        )
+
+    status = response.get('TrainingJobStatus', 'Unknown')
+    if status == 'Failed':
+        failure_reason = response.get('FailureReason', 'Unknown failure')
+        log_group = f"/aws/sagemaker/TrainingJobs/{training_job_name}"
+        raise SageMakerTrainingError(
+            f"Training job '{training_job_name}' failed: {failure_reason}. "
+            f"Check CloudWatch logs for details: {log_group}"
+        )
+
+
 # Parameter Store path mapping for fraud detection hyperparameters
 PARAM_PATHS: Dict[str, str] = {
     'objective': '/fraud-detection/hyperparameters/objective',
@@ -140,6 +212,101 @@ class ProductionIntegrator:
         )
 
         return backup, backup_key
+
+    def rollback_parameter_store(self, backup_key: str) -> Dict[str, Optional[str]]:
+        """
+        Rollback Parameter Store to previous values from a backup.
+
+        Loads a backup YAML file from S3 and restores each parameter value
+        to Parameter Store. Parameters that were None in the backup (i.e.,
+        did not exist before) are skipped.
+
+        Args:
+            backup_key: The S3 key of the backup file, e.g.
+                ``parameter-store-backups/backup-20240115-120000.yaml``.
+
+        Returns:
+            The backup dictionary that was restored, mapping Parameter Store
+            paths to their values.
+
+        Raises:
+            S3AccessError: If the backup file cannot be read from S3.
+            ParameterStoreError: If restoring a parameter fails.
+
+        Example:
+            integrator = ProductionIntegrator()
+            restored = integrator.rollback_parameter_store(
+                'parameter-store-backups/backup-20240115-120000.yaml'
+            )
+        """
+        try:
+            response = self.s3_client.get_object(
+                Bucket=self.config_bucket,
+                Key=backup_key,
+            )
+            backup = yaml.safe_load(response['Body'].read())
+        except Exception as e:
+            raise S3AccessError(
+                f"Failed to read backup from s3://{self.config_bucket}/{backup_key}. "
+                f"Ensure your IAM role has s3:GetObject permission for this bucket. "
+                f"Error: {e}"
+            )
+
+        for param_path, value in backup.items():
+            if value is not None:
+                try:
+                    self.ssm_client.put_parameter(
+                        Name=param_path,
+                        Value=value,
+                        Type='String',
+                        Overwrite=True,
+                    )
+                except Exception as e:
+                    raise ParameterStoreError(
+                        f"Failed to restore parameter '{param_path}' during rollback. "
+                        f"Error: {e}. "
+                        f"Manual rollback may be required for remaining parameters."
+                    )
+
+        return backup
+
+    def rollback_config_file(self, backup_key: str) -> None:
+        """
+        Rollback production config to a previous version from the archive.
+
+        Copies a backup configuration file from the archive directory to the
+        production config location in S3.
+
+        Args:
+            backup_key: The S3 key of the archived config file, e.g.
+                ``archive/production-model-config-20240115-120000.yaml``.
+
+        Raises:
+            S3AccessError: If the backup file cannot be copied in S3.
+
+        Example:
+            integrator = ProductionIntegrator()
+            integrator.rollback_config_file(
+                'archive/production-model-config-20240115-120000.yaml'
+            )
+        """
+        try:
+            self.s3_client.copy_object(
+                Bucket=self.config_bucket,
+                CopySource={
+                    'Bucket': self.config_bucket,
+                    'Key': backup_key,
+                },
+                Key='production-model-config.yaml',
+            )
+        except Exception as e:
+            raise S3AccessError(
+                f"Failed to rollback config from s3://{self.config_bucket}/{backup_key}. "
+                f"Ensure your IAM role has s3:GetObject and s3:PutObject permissions. "
+                f"Error: {e}"
+            )
+
+
 
     def validate_hyperparameters(self, hyperparameters: Dict[str, Any]) -> bool:
         """
