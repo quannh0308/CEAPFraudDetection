@@ -43,17 +43,14 @@ echo "Checking for security group..."
 SG_ID=$(aws ec2 describe-security-groups \
   --group-names temp-containment-sg \
   --query 'SecurityGroups[0].GroupId' \
-  --output text 2>/dev/null)
+  --output text 2>/dev/null || true)
 
 if [ -z "$SG_ID" ] || [ "$SG_ID" == "None" ]; then
   echo "Creating security group..."
-  aws ec2 create-security-group \
+  SG_ID=$(aws ec2 create-security-group \
     --group-name temp-containment-sg \
-    --description "Temporary SG for containment score boost"
-  
-  SG_ID=$(aws ec2 describe-security-groups \
-    --group-names temp-containment-sg \
-    --query 'SecurityGroups[0].GroupId' \
+    --description "Temporary SG for containment score boost" \
+    --query 'GroupId' \
     --output text)
 fi
 

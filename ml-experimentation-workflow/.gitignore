@@ -75,3 +75,6 @@ models/
 # Logs
 *.log
 logs/
+
+# Experiment results (local experiment state)
+experiment_results.json

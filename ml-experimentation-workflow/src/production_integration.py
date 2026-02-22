@@ -34,6 +34,7 @@ Example:
 """
 
 import json
+import os
 
 import boto3
 import yaml
@@ -172,7 +173,10 @@ class ProductionIntegrator:
         self.ssm_client = boto3.client('ssm')
         self.s3_client = boto3.client('s3')
         self.sfn_client = boto3.client('stepfunctions')
-        self.config_bucket = 'fraud-detection-config'
+        self.config_bucket = os.environ.get(
+            'CONFIG_BUCKET',
+            f"fraud-detection-config-{os.environ.get('BUCKET_SUFFIX', 'quannh0308-20260222')}"
+        )
         self.experiment_tracker = experiment_tracker
 
     def backup_current_parameters(self) -> Tuple[Dict[str, Optional[str]], str]:
@@ -656,10 +660,27 @@ class ProductionIntegrator:
             arn = integrator.trigger_production_pipeline('exp-20240115-001')
             print(f"Pipeline execution started: {arn}")
         """
-        state_machine_arn = (
-            'arn:aws:states:us-east-1:123456789012:'
-            'stateMachine:fraud-detection-training-pipeline'
-        )
+        # Discover state machine ARN dynamically
+        env_name = os.environ.get('ENVIRONMENT', 'dev')
+        state_machine_name = f"FraudDetectionTraining-{env_name}"
+        try:
+            response = self.sfn_client.list_state_machines()
+            state_machine_arn = None
+            for sm in response.get('stateMachines', []):
+                if sm['name'] == state_machine_name:
+                    state_machine_arn = sm['stateMachineArn']
+                    break
+            if not state_machine_arn:
+                raise RuntimeError(
+                    f"State machine '{state_machine_name}' not found. "
+                    f"Deploy the training pipeline first."
+                )
+        except Exception as e:
+            if 'state_machine_arn' not in dir():
+                raise RuntimeError(
+                    f"Failed to discover state machine: {e}"
+                )
+
         timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
         execution_name = f"experiment-{experiment_id}-{timestamp}"
 
