@@ -439,6 +439,99 @@ cd ml-experimentation-workflow/infrastructure
 ./deploy.sh --destroy
 ```
 
+### End-to-End Workflow
+
+The three flows have dependencies that determine the deployment and execution order:
+
+```
+1. Deploy Training Pipeline    ──→  2. Deploy Inference Pipeline
+        │                                      │
+        ▼                                      │
+3. Trigger Training Run        ──→  Creates:   │
+   (DataPrep + Train +              • Parquet data splits in S3
+    Evaluate + Deploy)               • Trained model
+                                     • SageMaker endpoint
+        │                                      │
+        ▼                                      ▼
+4. Run Experimentation         5. Trigger Inference Run
+   Notebooks (1-4)                (needs endpoint from step 3)
+        │
+        ▼
+6. Promote Winning Config
+   (Parameter Store + S3)
+        │
+        ▼
+7. Re-trigger Training Run
+   (uses optimized hyperparameters)
+```
+
+**Step 1-2: Deploy infrastructure**
+
+```bash
+# Set environment variables
+export AWS_REGION=us-east-1
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export ENVIRONMENT=dev
+export BUCKET_SUFFIX=your-unique-suffix
+
+# Build
+./gradlew clean build
+
+# Deploy training pipeline (creates shared S3 buckets)
+./deploy-training-pipeline.sh
+
+# Create metrics bucket (manual prerequisite)
+aws s3 mb s3://fraud-detection-metrics-${BUCKET_SUFFIX} --region ${AWS_REGION}
+
+# Deploy inference pipeline
+./deploy-inference-pipeline.sh
+
+# (Optional) Deploy SageMaker Studio
+cd ml-experimentation-workflow/infrastructure && ./deploy.sh && cd ../..
+```
+
+**Step 3: Trigger initial training run**
+
+This is required before experimentation — the DataPrep stage creates the Parquet data splits that the notebooks load from S3.
+
+```bash
+aws stepfunctions start-execution \
+  --state-machine-arn $(aws stepfunctions list-state-machines \
+    --query "stateMachines[?name=='FraudDetectionTraining-${ENVIRONMENT}'].stateMachineArn" \
+    --output text) \
+  --input "{
+    \"datasetS3Path\": \"s3://fraud-detection-data-${BUCKET_SUFFIX}/kaggle-credit-card-fraud.csv\",
+    \"outputPrefix\": \"s3://fraud-detection-data-${BUCKET_SUFFIX}/prepared/\",
+    \"trainSplit\": 0.70,
+    \"validationSplit\": 0.15,
+    \"testSplit\": 0.15
+  }"
+```
+
+Monitor progress in the Step Functions console. The full pipeline takes ~15-20 minutes.
+
+**Step 4: Run experimentation notebooks**
+
+Once the training pipeline has completed at least once (creating Parquet splits in S3), you can run the experimentation notebooks:
+
+```bash
+cd ml-experimentation-workflow
+pip install -r requirements.txt
+```
+
+Work through the notebooks in order:
+1. `01_data_exploration.ipynb` — Explore data (loads Parquet splits from S3)
+2. `02_hyperparameter_tuning.ipynb` — Find optimal hyperparameters
+3. `03_algorithm_comparison.ipynb` — Compare XGBoost, LightGBM, Random Forest, Neural Network
+4. `04_feature_engineering.ipynb` — Feature creation and selection
+5. `05_production_promotion.ipynb` — Evaluate winning model and promote config to production
+
+> **Important:** All notebooks load data from S3 (`s3://fraud-detection-data-{BUCKET_SUFFIX}/`). You need AWS credentials and the training pipeline must have run at least once to create the Parquet data splits.
+
+**Step 6-7: Promote and retrain**
+
+After finding optimal hyperparameters in the notebooks, promote them to production and trigger a retraining run. See the [Production Promotion](#manual-workflow-execution) section below.
+
 ### Manual Workflow Execution
 
 #### Training Pipeline

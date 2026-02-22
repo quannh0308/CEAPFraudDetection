@@ -299,7 +299,7 @@ class ScoreHandlerEndpointInvocationPropertyTest : FunSpec({
                 mockS3Client.putObject(any<PutObjectRequest>(), any<RequestBody>()) 
             } returns PutObjectResponse.builder().build()
             
-            val invokedFeatures = mutableListOf<Map<String, Double>>()
+            val invokedPayloads = mutableListOf<String>()
             
             // Mock SageMaker endpoint invocations
             every { 
@@ -307,10 +307,9 @@ class ScoreHandlerEndpointInvocationPropertyTest : FunSpec({
             } answers {
                 val request = firstArg<InvokeEndpointRequest>()
                 
-                // Capture the features sent in the request
+                // Capture the CSV payload sent in the request
                 val payload = request.body().asUtf8String()
-                val features = objectMapper.readValue(payload, Map::class.java) as Map<String, Double>
-                invokedFeatures.add(features)
+                invokedPayloads.add(payload)
                 
                 // Return a valid fraud score
                 InvokeEndpointResponse.builder()
@@ -334,11 +333,12 @@ class ScoreHandlerEndpointInvocationPropertyTest : FunSpec({
             // When the scoring stage processes the batch
             handler.handleRequest(input, mockContext)
             
-            // Then each invocation SHALL include the correct transaction features
-            invokedFeatures.size shouldBe transactions.size
+            // Then each invocation SHALL include the correct transaction features as CSV
+            invokedPayloads.size shouldBe transactions.size
             
             transactions.forEachIndexed { index, transaction ->
-                invokedFeatures[index] shouldBe transaction.features
+                val expectedCsv = transaction.features.values.joinToString(",")
+                invokedPayloads[index] shouldBe expectedCsv
             }
         }
     }

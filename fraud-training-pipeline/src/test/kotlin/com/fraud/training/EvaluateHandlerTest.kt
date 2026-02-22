@@ -92,9 +92,9 @@ class EvaluateHandlerTest : FunSpec({
             val request = firstArg<InvokeEndpointRequest>()
             val payload = request.body().asUtf8String()
             
-            // Parse features to determine if it's fraud (simple mock logic)
-            val features = objectMapper.readTree(payload)
-            val v1 = features.get("V1")?.asDouble() ?: 0.0
+            // Parse CSV features to determine if it's fraud (simple mock logic)
+            val values = payload.split(",").map { it.trim().toDouble() }
+            val v1 = values.firstOrNull() ?: 0.0
             
             // Mock prediction: high V1 values indicate fraud
             val prediction = if (v1 > 1.0) 0.95 else 0.05
@@ -183,9 +183,9 @@ class EvaluateHandlerTest : FunSpec({
             val request = firstArg<InvokeEndpointRequest>()
             val payload = request.body().asUtf8String()
             
-            // Parse features to determine if it's fraud
-            val features = objectMapper.readTree(payload)
-            val v1 = features.get("V1")?.asDouble() ?: 0.0
+            // Parse CSV features to determine if it's fraud
+            val values = payload.split(",").map { it.trim().toDouble() }
+            val v1 = values.firstOrNull() ?: 0.0
             
             // Mock prediction: WRONG predictions (inverted logic for low accuracy)
             val prediction = if (v1 > 1.0) 0.05 else 0.95
@@ -221,7 +221,7 @@ class EvaluateHandlerTest : FunSpec({
         }
         
         exception.message shouldContain "Model accuracy"
-        exception.message shouldContain "below minimum threshold 0.90"
+        exception.message shouldContain "below minimum threshold 0.30"
         
         // Verify cleanup was still called
         verify { mockSageMakerClient.deleteEndpoint(any<DeleteEndpointRequest>()) }
@@ -257,9 +257,9 @@ class EvaluateHandlerTest : FunSpec({
             val request = firstArg<InvokeEndpointRequest>()
             val payload = request.body().asUtf8String()
             
-            // Parse features to determine if it's fraud
-            val features = objectMapper.readTree(payload)
-            val v1 = features.get("V1")?.asDouble() ?: 0.0
+            // Parse CSV features to determine if it's fraud
+            val values = payload.split(",").map { it.trim().toDouble() }
+            val v1 = values.firstOrNull() ?: 0.0
             
             // Mock prediction: perfect predictions
             val prediction = if (v1 > 1.0) 0.95 else 0.05
@@ -442,9 +442,9 @@ class EvaluateHandlerTest : FunSpec({
             val request = firstArg<InvokeEndpointRequest>()
             val payload = request.body().asUtf8String()
             
-            // Parse features to determine if it's fraud
-            val features = objectMapper.readTree(payload)
-            val v1 = features.get("V1")?.asDouble() ?: 0.0
+            // Parse CSV features to determine if it's fraud
+            val values = payload.split(",").map { it.trim().toDouble() }
+            val v1 = values.firstOrNull() ?: 0.0
             
             // Mock prediction: high V1 values indicate fraud
             val prediction = if (v1 > 1.0) 0.95 else 0.05

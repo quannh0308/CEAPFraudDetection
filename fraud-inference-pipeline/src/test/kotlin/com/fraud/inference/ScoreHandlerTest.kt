@@ -662,10 +662,10 @@ class ScoreHandlerTest : FunSpec({
         } answers {
             val request = firstArg<InvokeEndpointRequest>()
             
-            // Verify the features are sent correctly
+            // Verify the features are sent correctly as CSV (values only, comma-separated)
             val payload = request.body().asUtf8String()
-            val sentFeatures = objectMapper.readValue(payload, Map::class.java) as Map<String, Double>
-            sentFeatures shouldBe expectedFeatures
+            val expectedCsv = expectedFeatures.values.joinToString(",")
+            payload shouldBe expectedCsv
             
             InvokeEndpointResponse.builder()
                 .body(SdkBytes.fromUtf8String("0.5"))

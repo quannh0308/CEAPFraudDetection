@@ -170,7 +170,11 @@ Dependencies: boto3, sagemaker, pandas, numpy, scikit-learn, xgboost, lightgbm, 
 4. Install dependencies: `pip install -r requirements.txt`
 5. Open any notebook in `notebooks/` to get started.
 
+> **Important: Data Dependency** — The experimentation notebooks load Parquet data splits from `s3://fraud-detection-data-{BUCKET_SUFFIX}/prepared/` (train.parquet, validation.parquet, test.parquet). These files are created by the training pipeline's DataPrep stage. You must deploy and run the training pipeline at least once before the notebooks will work. See the [main README's End-to-End Workflow](../README.md#end-to-end-workflow) for the full deployment sequence.
+
 ## Quick Start
+
+> **Prerequisite:** The training pipeline must have run at least once to create the Parquet data splits in S3. See the [End-to-End Workflow](../README.md#end-to-end-workflow) in the main README.
 
 ```python
 from src.experiment_tracking import ExperimentTracker

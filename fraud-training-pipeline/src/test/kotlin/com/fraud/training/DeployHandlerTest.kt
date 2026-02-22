@@ -237,7 +237,7 @@ class DeployHandlerTest : FunSpec({
         // Verify health check was performed
         val invokeRequest = capturedInvokeRequest.captured
         invokeRequest.endpointName() shouldBe "fraud-detection-prod"
-        invokeRequest.contentType() shouldBe "application/json"
+        invokeRequest.contentType() shouldBe "text/csv"
         
         // Verify result includes health check prediction
         result.get("healthCheckPrediction").asDouble() shouldBe 0.0789
