@@ -1,0 +1,89 @@
+{
+  "hyperparameter_tuning": {
+    "best_params": {
+      "objective": "binary:logistic",
+      "num_round": 150,
+      "max_depth": 7,
+      "eta": 0.2,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8
+    },
+    "best_score": 0.99940949996457,
+    "method": "grid_search",
+    "timestamp": "2026-02-22T23:20:06.223865"
+  },
+  "algorithm_comparison": {
+    "best_algorithm": "RandomForest",
+    "best_accuracy": 0.9993858799631528,
+    "best_f1": 0.8266666666666667,
+    "best_auc": 0.9639993383946328,
+    "all_results": [
+      {
+        "algorithm": "XGBoost",
+        "accuracy": 0.9991496799489809,
+        "precision": 0.8571428571428571,
+        "recall": 0.6976744186046512,
+        "f1": 0.7692307692307693,
+        "auc_roc": 0.9497335414656486,
+        "training_time_seconds": 0.861809253692627
+      },
+      {
+        "algorithm": "LightGBM",
+        "accuracy": 0.9975435198526111,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "auc_roc": 0.3875947892797914,
+        "training_time_seconds": 0.6583340167999268
+      },
+      {
+        "algorithm": "RandomForest",
+        "accuracy": 0.9993858799631528,
+        "precision": 0.96875,
+        "recall": 0.7209302325581395,
+        "f1": 0.8266666666666667,
+        "auc_roc": 0.9639993383946328,
+        "training_time_seconds": 70.041020154953
+      },
+      {
+        "algorithm": "NeuralNetwork",
+        "accuracy": 0.9979686798781208,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "auc_roc": 0.4950902496872236,
+        "training_time_seconds": 8.120959281921387
+      }
+    ],
+    "timestamp": "2026-02-22T23:22:20.668106"
+  },
+  "feature_engineering": {
+    "selected_features": [
+      "V3_x_V4",
+      "V17",
+      "V14",
+      "V12",
+      "V10",
+      "V16",
+      "V3",
+      "V7",
+      "V11",
+      "V4",
+      "V18",
+      "V1",
+      "V9",
+      "V5",
+      "V2",
+      "V1_x_V2",
+      "V6",
+      "V21",
+      "V19",
+      "V20"
+    ],
+    "selection_method": "univariate_f_classif",
+    "n_features": 20,
+    "accuracy_all_features": 0.9994567399674044,
+    "accuracy_selected_features": 0.9994331199659872,
+    "timestamp": "2026-02-22T23:34:26.665624"
+  }
+}

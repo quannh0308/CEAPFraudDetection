@@ -73,8 +73,8 @@ open class TrainHandler(
 
         val defaults = mapOf(
             "objective" to "binary:logistic",
-            "num_round" to "100",
-            "max_depth" to "5",
+            "num_round" to "150",
+            "max_depth" to "7",
             "eta" to "0.2",
             "subsample" to "0.8",
             "colsample_bytree" to "0.8"

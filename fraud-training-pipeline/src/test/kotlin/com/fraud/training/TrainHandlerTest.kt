@@ -55,8 +55,8 @@ class TrainHandlerTest : FunSpec({
             val paramName = request.name().substringAfterLast("/")
             val value = when (paramName) {
                 "objective" -> "binary:logistic"
-                "num_round" -> "100"
-                "max_depth" -> "5"
+                "num_round" -> "150"
+                "max_depth" -> "7"
                 "eta" -> "0.2"
                 "subsample" -> "0.8"
                 "colsample_bytree" -> "0.8"
@@ -143,8 +143,8 @@ class TrainHandlerTest : FunSpec({
         // Verify hyperparameters
         val hyperParams = request.hyperParameters()
         hyperParams["objective"] shouldBe "binary:logistic"
-        hyperParams["num_round"] shouldBe "100"
-        hyperParams["max_depth"] shouldBe "5"
+        hyperParams["num_round"] shouldBe "150"
+        hyperParams["max_depth"] shouldBe "7"
         hyperParams["eta"] shouldBe "0.2"
         hyperParams["subsample"] shouldBe "0.8"
         hyperParams["colsample_bytree"] shouldBe "0.8"
