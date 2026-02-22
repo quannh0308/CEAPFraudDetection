@@ -221,7 +221,7 @@ class EvaluateHandlerTest : FunSpec({
         }
         
         exception.message shouldContain "Model accuracy"
-        exception.message shouldContain "below minimum threshold 0.30"
+        exception.message shouldContain "below minimum threshold 0.90"
         
         // Verify cleanup was still called
         verify { mockSageMakerClient.deleteEndpoint(any<DeleteEndpointRequest>()) }

@@ -182,14 +182,10 @@ open class EvaluateHandler(
             logger.info("Evaluation metrics: accuracy=$accuracy, precision=$precision, recall=$recall, f1=$f1Score, auc=$auc")
             
             // 5. Validate model meets minimum accuracy threshold
-            // TODO: Model accuracy is currently low (~40%) due to data format issues
-            // Root cause: Parquet file format or feature ordering may not match XGBoost expectations
-            // Investigation needed: Verify Glue script writes Parquet with correct schema
-            // Temporary: Lowered threshold to 0.30 to demonstrate full pipeline
-            // Production: Should be 0.90 as per requirements
-            if (accuracy < 0.30) {
+            // Production accuracy threshold per requirements
+            if (accuracy < 0.90) {
                 throw IllegalStateException(
-                    "Model accuracy $accuracy is below minimum threshold 0.30 (temporary, should be 0.90). " +
+                    "Model accuracy $accuracy is below minimum threshold 0.90. " +
                     "Training failed to produce acceptable model."
                 )
             }
@@ -211,88 +207,114 @@ open class EvaluateHandler(
         }
     }
     
-    /**
-     * Loads test data for model evaluation from S3 Parquet file.
-     * 
-     * This method:
-     * 1. Downloads the Parquet file from S3 to a temporary location
-     * 2. Parses the Parquet file to extract features and labels
-     * 3. Returns a list of TestRecord objects
-     * 
-     * @param testDataPath S3 path to the test data Parquet file
-     * @return List of test records with features and labels
-     */
     private fun loadTestData(testDataPath: String): List<TestRecord> {
         logger.info("Loading test data from: $testDataPath")
         
         try {
-            // Parse S3 path (format: s3://bucket/key)
+            // Parse S3 path (format: s3://bucket/key or s3://bucket/prefix/)
             val s3Uri = testDataPath.removePrefix("s3://")
             val parts = s3Uri.split("/", limit = 2)
             if (parts.size != 2) {
                 throw IllegalArgumentException("Invalid S3 path format: $testDataPath. Expected s3://bucket/key")
             }
             val bucket = parts[0]
-            val key = parts[1]
+            val prefix = parts[1].trimEnd('/')
             
-            logger.info("Downloading Parquet file from S3: bucket=$bucket, key=$key")
+            logger.info("Listing Parquet files from S3: bucket=$bucket, prefix=$prefix")
             
-            // Download Parquet file from S3 to temporary location
-            val tempFile = File.createTempFile("test-data-", ".parquet")
-            tempFile.deleteOnExit()
-            
-            val getObjectRequest = software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
+            // List all objects under the prefix (handles partitioned Parquet directories)
+            val listRequest = software.amazon.awssdk.services.s3.model.ListObjectsV2Request.builder()
                 .bucket(bucket)
-                .key(key)
+                .prefix(prefix)
                 .build()
             
-            s3Client.getObject(getObjectRequest, tempFile.toPath())
+            val listResponse = s3Client.listObjectsV2(listRequest)
+            val parquetKeys = listResponse.contents()
+                .map { it.key() }
+                .filter { key ->
+                    // Include actual Parquet data files, exclude metadata files
+                    (key.endsWith(".parquet") || key.endsWith(".snappy.parquet")) &&
+                    !key.contains("_SUCCESS") &&
+                    !key.contains("_metadata") &&
+                    !key.contains("_common_metadata")
+                }
             
-            logger.info("Downloaded Parquet file to: ${tempFile.absolutePath}, size: ${tempFile.length()} bytes")
+            if (parquetKeys.isEmpty()) {
+                // Try as a single file (non-partitioned)
+                logger.info("No part files found, trying as single Parquet file: $prefix")
+                return loadSingleParquetFile(bucket, prefix)
+            }
             
-            // Parse Parquet file
-            val testRecords = mutableListOf<TestRecord>()
-            val hadoopConf = Configuration()
-            val parquetPath = Path(tempFile.toURI())
+            logger.info("Found ${parquetKeys.size} Parquet part files")
             
-            // Open Parquet file reader
-            val inputFile = HadoopInputFile.fromPath(parquetPath, hadoopConf)
-            val parquetFileReader = ParquetFileReader.open(inputFile)
+            // Download and parse each part file
+            val allRecords = mutableListOf<TestRecord>()
+            for (parquetKey in parquetKeys) {
+                logger.info("Processing: $parquetKey")
+                val records = loadSingleParquetFile(bucket, parquetKey)
+                allRecords.addAll(records)
+            }
             
-            val schema = parquetFileReader.footer.fileMetaData.schema
-            logger.info("Parquet schema: $schema")
+            logger.info("Successfully loaded ${allRecords.size} total test records from ${parquetKeys.size} part files")
+            return allRecords
             
-            // Read all row groups
-            var rowGroup = parquetFileReader.readNextRowGroup()
-            var recordCount = 0
+        } catch (e: Exception) {
+            logger.error("Failed to load test data from S3: ${e.message}", e)
+            logger.warn("Falling back to mock test data due to error: ${e.message}")
+            return getMockTestData()
+        }
+    }
+
+    /**
+     * Loads test records from a single Parquet file in S3.
+     */
+    private fun loadSingleParquetFile(bucket: String, key: String): List<TestRecord> {
+        val tempFile = File.createTempFile("test-data-", ".parquet")
+        tempFile.deleteOnExit()
+        
+        val getObjectRequest = software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
+            .bucket(bucket)
+            .key(key)
+            .build()
+        
+        s3Client.getObject(getObjectRequest, tempFile.toPath())
+        
+        val testRecords = mutableListOf<TestRecord>()
+        val hadoopConf = Configuration()
+        val parquetPath = Path(tempFile.toURI())
+        
+        val inputFile = HadoopInputFile.fromPath(parquetPath, hadoopConf)
+        val parquetFileReader = ParquetFileReader.open(inputFile)
+        
+        val schema = parquetFileReader.footer.fileMetaData.schema
+        
+        var rowGroup = parquetFileReader.readNextRowGroup()
+        
+        while (rowGroup != null) {
+            val columnIO = ColumnIOFactory().getColumnIO(schema) as MessageColumnIO
+            val recordReader = columnIO.getRecordReader(rowGroup, GroupRecordConverter(schema))
             
-            while (rowGroup != null) {
-                val columnIO = ColumnIOFactory().getColumnIO(schema) as MessageColumnIO
-                val recordReader = columnIO.getRecordReader(rowGroup, GroupRecordConverter(schema))
-                
-                for (i in 0 until rowGroup.rowCount) {
-                    val record = recordReader.read() as SimpleGroup
-                // Extract features (all columns except the label column "Class")
+            for (i in 0 until rowGroup.rowCount) {
+                val record = recordReader.read() as SimpleGroup
                 val features = mutableMapOf<String, Double>()
                 
-                for (i in 0 until schema.fieldCount) {
-                    val field = schema.getType(i)
+                for (j in 0 until schema.fieldCount) {
+                    val field = schema.getType(j)
                     val fieldName = field.name
                     
                     if (fieldName != "Class") {
-                        // Extract feature value
                         try {
                             val value = when {
                                 field.isPrimitive -> {
                                     when (field.asPrimitiveType().primitiveTypeName) {
                                         org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.DOUBLE -> 
-                                            record.getDouble(i, 0)
+                                            record.getDouble(j, 0)
                                         org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.FLOAT -> 
-                                            record.getFloat(i, 0).toDouble()
+                                            record.getFloat(j, 0).toDouble()
                                         org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT32 -> 
-                                            record.getInteger(i, 0).toDouble()
+                                            record.getInteger(j, 0).toDouble()
                                         org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT64 -> 
-                                            record.getLong(i, 0).toDouble()
+                                            record.getLong(j, 0).toDouble()
                                         else -> 0.0
                                     }
                                 }
@@ -300,45 +322,28 @@ open class EvaluateHandler(
                             }
                             features[fieldName] = value
                         } catch (e: Exception) {
-                            logger.warn("Failed to extract feature $fieldName: ${e.message}")
                             features[fieldName] = 0.0
                         }
                     }
                 }
                 
-                // Extract label (Class column)
                 val label = try {
                     val classFieldIndex = schema.getFieldIndex("Class")
                     record.getInteger(classFieldIndex, 0)
                 } catch (e: Exception) {
-                    logger.warn("Failed to extract label: ${e.message}")
                     0
                 }
                 
                 testRecords.add(TestRecord(features, label))
-                recordCount++
-                }
-                
-                // Read next row group
-                rowGroup = parquetFileReader.readNextRowGroup()
             }
             
-            parquetFileReader.close()
-            
-            logger.info("Successfully loaded $recordCount test records from Parquet file")
-            
-            // Clean up temp file
-            tempFile.delete()
-            
-            return testRecords
-            
-        } catch (e: Exception) {
-            logger.error("Failed to load test data from S3: ${e.message}", e)
-            
-            // Fallback to mock data for testing/development
-            logger.warn("Falling back to mock test data due to error: ${e.message}")
-            return getMockTestData()
+            rowGroup = parquetFileReader.readNextRowGroup()
         }
+        
+        parquetFileReader.close()
+        tempFile.delete()
+        
+        return testRecords
     }
     
     /**

@@ -553,6 +553,20 @@ aws stepfunctions describe-execution \
   --execution-arn <execution-arn>
 ```
 
+#### Checking Training Metrics
+
+After a training run completes, check the evaluation metrics from the EvaluateStage output:
+
+```bash
+# Get the execution ID from the ARN (last segment after the colon)
+EXECUTION_ID="your-execution-id"
+
+# Read the evaluation output
+aws s3 cp s3://fraud-detection-workflow-${BUCKET_SUFFIX}/executions/${EXECUTION_ID}/EvaluateStage/output.json - | jq '.'
+```
+
+This shows accuracy, precision, recall, F1 score, AUC, and the number of test records evaluated. The model must achieve accuracy >= 0.90 to pass the evaluation stage.
+
 #### Inference Pipeline
 
 ```bash
