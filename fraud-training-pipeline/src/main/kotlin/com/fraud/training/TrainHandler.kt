@@ -7,6 +7,8 @@ import com.fraud.common.handler.WorkflowLambdaHandler
 import software.amazon.awssdk.services.sagemaker.SageMakerClient
 import software.amazon.awssdk.services.sagemaker.model.*
 import software.amazon.awssdk.services.sagemaker.waiters.SageMakerWaiter
+import software.amazon.awssdk.services.ssm.SsmClient
+import software.amazon.awssdk.services.ssm.model.GetParameterRequest
 
 /**
  * Lambda handler for the training stage of the fraud detection ML pipeline.
@@ -50,10 +52,56 @@ import software.amazon.awssdk.services.sagemaker.waiters.SageMakerWaiter
  */
 open class TrainHandler(
     private val sageMakerClient: SageMakerClient = SageMakerClient.builder().build(),
+    private val ssmClient: SsmClient = SsmClient.builder().build(),
     private val sageMakerExecutionRoleArn: String = System.getenv("SAGEMAKER_EXECUTION_ROLE_ARN")
         ?: throw IllegalStateException("SAGEMAKER_EXECUTION_ROLE_ARN environment variable must be set")
 ) : WorkflowLambdaHandler() {
     
+    /**
+     * Reads hyperparameters from AWS Parameter Store.
+     * Falls back to default values if Parameter Store is unavailable.
+     */
+    private fun loadHyperparameters(): Map<String, String> {
+        val paramPaths = mapOf(
+            "objective" to "/fraud-detection/hyperparameters/objective",
+            "num_round" to "/fraud-detection/hyperparameters/num_round",
+            "max_depth" to "/fraud-detection/hyperparameters/max_depth",
+            "eta" to "/fraud-detection/hyperparameters/eta",
+            "subsample" to "/fraud-detection/hyperparameters/subsample",
+            "colsample_bytree" to "/fraud-detection/hyperparameters/colsample_bytree"
+        )
+
+        val defaults = mapOf(
+            "objective" to "binary:logistic",
+            "num_round" to "100",
+            "max_depth" to "5",
+            "eta" to "0.2",
+            "subsample" to "0.8",
+            "colsample_bytree" to "0.8"
+        )
+
+        val hyperparameters = mutableMapOf<String, String>()
+
+        for ((name, path) in paramPaths) {
+            try {
+                val response = ssmClient.getParameter(
+                    GetParameterRequest.builder()
+                        .name(path)
+                        .build()
+                )
+                val value = response.parameter().value()
+                hyperparameters[name] = value
+                logger.info("Loaded hyperparameter from Parameter Store: $name = $value")
+            } catch (e: Exception) {
+                val defaultValue = defaults[name] ?: ""
+                hyperparameters[name] = defaultValue
+                logger.warn("Failed to read $path from Parameter Store, using default: $name = $defaultValue. Error: ${e.message}")
+            }
+        }
+
+        return hyperparameters
+    }
+
     /**
      * Processes the training stage by configuring and launching a SageMaker training job.
      * 
@@ -81,6 +129,10 @@ open class TrainHandler(
         // 2. Configure SageMaker training job
         val trainingJobName = "fraud-detection-${System.currentTimeMillis()}"
         logger.info("Creating training job: $trainingJobName")
+        
+        // Load hyperparameters from Parameter Store (with defaults as fallback)
+        val hyperparameters = loadHyperparameters()
+        logger.info("Using hyperparameters: $hyperparameters")
         
         val trainingJobRequest = CreateTrainingJobRequest.builder()
             .trainingJobName(trainingJobName)
@@ -140,16 +192,7 @@ open class TrainHandler(
                     .maxRuntimeInSeconds(3600) // 1 hour max
                     .build()
             )
-            .hyperParameters(
-                mapOf(
-                    "objective" to "binary:logistic",
-                    "num_round" to "100",
-                    "max_depth" to "5",
-                    "eta" to "0.2",
-                    "subsample" to "0.8",
-                    "colsample_bytree" to "0.8"
-                )
-            )
+            .hyperParameters(hyperparameters)
             .build()
         
         // 3. Start training job

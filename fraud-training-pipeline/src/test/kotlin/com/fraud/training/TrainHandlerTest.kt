@@ -13,14 +13,19 @@ import io.mockk.*
 import software.amazon.awssdk.services.sagemaker.SageMakerClient
 import software.amazon.awssdk.services.sagemaker.model.*
 import software.amazon.awssdk.services.sagemaker.waiters.SageMakerWaiter
+import software.amazon.awssdk.services.ssm.SsmClient
+import software.amazon.awssdk.services.ssm.model.GetParameterRequest
+import software.amazon.awssdk.services.ssm.model.GetParameterResponse
+import software.amazon.awssdk.services.ssm.model.Parameter
 
 /**
  * Test wrapper for TrainHandler that exposes processData for testing.
  */
 class TestableTrainHandler(
     sageMakerClient: SageMakerClient,
+    ssmClient: SsmClient,
     sageMakerExecutionRoleArn: String
-) : TrainHandler(sageMakerClient, sageMakerExecutionRoleArn) {
+) : TrainHandler(sageMakerClient, ssmClient, sageMakerExecutionRoleArn) {
     public override fun processData(input: JsonNode): JsonNode {
         return super.processData(input)
     }
@@ -40,6 +45,28 @@ class TestableTrainHandler(
  */
 class TrainHandlerTest : FunSpec({
     val objectMapper: ObjectMapper = jacksonObjectMapper()
+    
+    // Mock SSM client for all tests
+    val mockSsmClient = mockk<SsmClient>()
+    
+    beforeTest {
+        every { mockSsmClient.getParameter(any<GetParameterRequest>()) } answers {
+            val request = firstArg<GetParameterRequest>()
+            val paramName = request.name().substringAfterLast("/")
+            val value = when (paramName) {
+                "objective" -> "binary:logistic"
+                "num_round" -> "100"
+                "max_depth" -> "5"
+                "eta" -> "0.2"
+                "subsample" -> "0.8"
+                "colsample_bytree" -> "0.8"
+                else -> "unknown"
+            }
+            GetParameterResponse.builder()
+                .parameter(Parameter.builder().name(request.name()).value(value).build())
+                .build()
+        }
+    }
     
     test("processData should configure training job with correct parameters") {
         // Mock SageMaker client
@@ -66,6 +93,7 @@ class TrainHandlerTest : FunSpec({
         // Create handler with mocked client using constructor injection
         val handler = TestableTrainHandler(
             sageMakerClient = mockSageMakerClient,
+            ssmClient = mockSsmClient,
             sageMakerExecutionRoleArn = "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
         )
         
@@ -165,6 +193,7 @@ class TrainHandlerTest : FunSpec({
         // Create handler with mocked client using constructor injection
         val handler = TestableTrainHandler(
             sageMakerClient = mockSageMakerClient,
+            ssmClient = mockSsmClient,
             sageMakerExecutionRoleArn = "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
         )
         
@@ -209,6 +238,7 @@ class TrainHandlerTest : FunSpec({
         // Create handler with mocked client using constructor injection
         val handler = TestableTrainHandler(
             sageMakerClient = mockSageMakerClient,
+            ssmClient = mockSsmClient,
             sageMakerExecutionRoleArn = "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
         )
         
@@ -244,6 +274,7 @@ class TrainHandlerTest : FunSpec({
         // Create handler with mocked client using constructor injection
         val handler = TestableTrainHandler(
             sageMakerClient = mockSageMakerClient,
+            ssmClient = mockSsmClient,
             sageMakerExecutionRoleArn = "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
         )
         
@@ -267,6 +298,7 @@ class TrainHandlerTest : FunSpec({
         val mockSageMakerClient = mockk<SageMakerClient>()
         val handler = TestableTrainHandler(
             sageMakerClient = mockSageMakerClient,
+            ssmClient = mockSsmClient,
             sageMakerExecutionRoleArn = "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
         )
         
@@ -288,6 +320,7 @@ class TrainHandlerTest : FunSpec({
         val mockSageMakerClient = mockk<SageMakerClient>()
         val handler = TestableTrainHandler(
             sageMakerClient = mockSageMakerClient,
+            ssmClient = mockSsmClient,
             sageMakerExecutionRoleArn = "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
         )
         
@@ -326,6 +359,7 @@ class TrainHandlerTest : FunSpec({
         // Create handler with mocked client using constructor injection
         val handler = TestableTrainHandler(
             sageMakerClient = mockSageMakerClient,
+            ssmClient = mockSsmClient,
             sageMakerExecutionRoleArn = "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
         )
         
@@ -374,6 +408,7 @@ class TrainHandlerTest : FunSpec({
         // Create handler with mocked client using constructor injection
         val handler = TestableTrainHandler(
             sageMakerClient = mockSageMakerClient,
+            ssmClient = mockSsmClient,
             sageMakerExecutionRoleArn = "arn:aws:iam::123456789012:role/SageMakerExecutionRole"
         )
         

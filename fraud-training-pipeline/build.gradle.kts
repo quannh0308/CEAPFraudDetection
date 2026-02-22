@@ -22,6 +22,7 @@ dependencies {
     implementation("software.amazon.awssdk:s3")
     implementation("software.amazon.awssdk:sagemaker")
     implementation("software.amazon.awssdk:sagemakerruntime")
+    implementation("software.amazon.awssdk:ssm")
     
     // AWS Lambda
     implementation("com.amazonaws:aws-lambda-java-core:1.2.3")

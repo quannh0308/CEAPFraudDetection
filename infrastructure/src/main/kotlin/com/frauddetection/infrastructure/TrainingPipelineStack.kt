@@ -257,6 +257,20 @@ class TrainingPipelineStack(
                 .build()
         )
         
+        // Grant Parameter Store read access for hyperparameters
+        trainHandler.addToRolePolicy(
+            PolicyStatement.Builder.create()
+                .effect(Effect.ALLOW)
+                .actions(listOf(
+                    "ssm:GetParameter",
+                    "ssm:GetParameters"
+                ))
+                .resources(listOf(
+                    "arn:aws:ssm:*:*:parameter/fraud-detection/hyperparameters/*"
+                ))
+                .build()
+        )
+        
         // Evaluate Handler Lambda
         evaluateHandler = Function.Builder.create(this, "EvaluateHandler")
             .functionName("fraud-detection-evaluate-$envName")
