@@ -2,6 +2,12 @@
 
 ## You're Ready to Deploy! 🚀
 
+The fraud detection system has three flows that form a complete ML lifecycle:
+
+```
+Experiment (SageMaker Studio) → Train (Weekly Pipeline) → Infer (Daily Pipeline)
+```
+
 You already have:
 - ✅ Dataset uploaded: `s3://fraud-detection-data-quannh0308-20260214/kaggle-credit-card-fraud.csv`
 - ✅ Code configured to use your bucket suffix: `quannh0308-20260214`
@@ -47,6 +53,37 @@ export ENVIRONMENT=dev
 - SNS topics: fraud-detection-alerts, fraud-detection-monitoring
 - Step Functions: FraudDetectionInferenceWorkflow
 - EventBridge: Daily schedule (1 AM)
+
+## Set Up ML Experimentation (Optional)
+
+The experimentation flow lets data scientists explore hyperparameters and algorithms in SageMaker Studio, then promote winning configs to the training pipeline.
+
+### Install Python Dependencies
+
+```bash
+cd ml-experimentation-workflow
+pip install -r requirements.txt
+```
+
+### Deploy SageMaker Studio (Optional)
+
+```bash
+cd ml-experimentation-workflow/infrastructure
+./deploy.sh
+```
+
+### Run a Quick Experiment Locally
+
+You can run experiments locally without deploying SageMaker Studio using the notebook template:
+
+```bash
+cd ml-experimentation-workflow
+jupyter notebook notebooks/template.ipynb
+```
+
+The notebook walks through experiment tracking, hyperparameter tuning, algorithm comparison, and promoting a winning configuration to production.
+
+> **Tip:** The experimentation workflow is independent of the training/inference pipelines. You can set it up at any time — before or after deploying the production pipelines.
 
 ## Run Your First Training
 
@@ -164,4 +201,5 @@ aws s3 rb s3://fraud-detection-config-quannh0308-20260214
 
 ## Need Help?
 
-See `DEPLOYMENT-SETUP.md` for detailed step-by-step instructions.
+- See `DEPLOYMENT-SETUP.md` for detailed step-by-step instructions.
+- See `ml-experimentation-workflow/README.md` for experimentation workflow details.

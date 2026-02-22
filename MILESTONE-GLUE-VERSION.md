@@ -8,6 +8,8 @@
 
 This milestone marks the completion of the fraud detection ML pipeline with **AWS Glue** for data preparation. This version represents the original design as specified in the requirements and design documents.
 
+> **📌 Evolution Note:** Since this milestone, the system has evolved to include a third flow — the **ML Experimentation Workflow** — which bridges data science exploration with the production pipeline. Data scientists use SageMaker Studio to experiment with hyperparameters and algorithms, then promote winning configurations to the Training Pipeline via Parameter Store and S3. See the root `README.md` for the current three-flow architecture.
+
 ## Architecture
 
 ### Training Pipeline (Standard Workflow)
@@ -175,8 +177,11 @@ To work around Glue service quota limitations, the next version will:
 - Use pandas/scikit-learn in Lambda (same as Glue script)
 - Increase Lambda memory to 10GB and timeout to 15 minutes
 
+### ✅ Completed Since This Milestone
+- **ML Experimentation Workflow** — A Python-based experimentation toolkit (SageMaker Studio) for data scientists to explore, tune, and compare models. Includes ExperimentTracker, HyperparameterTuner, AlgorithmComparator, FeatureEngineer, ModelEvaluator, ProductionIntegrator, and ABTestingManager. Promotes winning configurations to the production training pipeline via Parameter Store and S3. See `ml-experimentation-workflow/README.md`.
+- **Model versioning and A/B testing** — Implemented as part of the ML Experimentation Workflow via the ABTestingManager module, enabling controlled comparison of model variants before production promotion.
+
 ### Future Enhancements
-- Model versioning and A/B testing
 - Real-time streaming inference
 - Enhanced monitoring dashboards
 - Automated retraining triggers based on drift detection

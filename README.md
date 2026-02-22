@@ -1,17 +1,20 @@
 # Fraud Detection ML Pipeline
 
-**Version:** 1.1.0-lambda (Lambda-based Data Preparation)  
-**Previous Stable:** 1.0.0-glue (Glue-based - see tag `v1.0.0-glue`)  
+**Version:** 1.2.0-experimentation (Three-Flow Architecture)  
+**Previous Stable:** 1.1.0-lambda (Lambda-based Data Preparation), 1.0.0-glue (Glue-based - see tag `v1.0.0-glue`)  
 **Status:** ✅ Deployed and Tested  
 **Date:** February 15, 2026
 
-A production-ready fraud detection system demonstrating the CEAP (Customer Engagement & Action Platform) workflow orchestration framework. The system implements two ML pipelines orchestrated via AWS Step Functions: a weekly training pipeline that builds and deploys fraud detection models to SageMaker, and a daily inference pipeline that scores transactions and alerts on high-risk cases.
+A production-ready fraud detection system demonstrating the CEAP (Customer Engagement & Action Platform) workflow orchestration framework. The system implements **three ML flows**: a Python-based experimentation flow for data scientists to explore and tune models in SageMaker Studio, a weekly training pipeline that builds and deploys fraud detection models to SageMaker, and a daily inference pipeline that scores transactions and alerts on high-risk cases. The experimentation flow feeds winning configurations into the training pipeline, which in turn deploys models consumed by the inference pipeline.
 
 > **📌 Version Note:** This version uses **AWS Lambda** for data preparation (10GB memory, 15-min timeout). The original Glue-based version (v1.0.0-glue) is available as a stable milestone for accounts with Glue service quotas enabled. See `MILESTONE-GLUE-VERSION.md` for the Glue implementation.
 
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
+- [Experiment Flow (SageMaker Studio)](#experiment-flow-sagemaker-studio)
+- [Training Pipeline (Weekly)](#training-pipeline-standard-workflow---weekly)
+- [Inference Pipeline (Daily)](#inference-pipeline-express-workflow---daily)
 - [System Components](#system-components)
 - [Prerequisites](#prerequisites)
 - [Setup Instructions](#setup-instructions)
@@ -19,11 +22,84 @@ A production-ready fraud detection system demonstrating the CEAP (Customer Engag
 - [Monitoring and Operations](#monitoring-and-operations)
 - [Troubleshooting](#troubleshooting)
 - [Cost Estimation](#cost-estimation)
-- [ML Experimentation Workflow](#ml-experimentation-workflow)
 
 ## Architecture Overview
 
-The system consists of two independent ML pipelines:
+The system consists of three interconnected ML flows that form a complete model lifecycle — from experimentation through training to production inference:
+
+```
+┌─────────────────────┐       ┌─────────────────────┐       ┌─────────────────────┐
+│   Experiment Flow   │       │   Training Flow      │       │   Inference Flow     │
+│  (SageMaker Studio) │──────▶│  (Weekly Pipeline)   │──────▶│  (Daily Pipeline)    │
+│                     │       │                      │       │                      │
+│  Data scientists    │       │  Automated model     │       │  Scores transactions │
+│  explore, tune, and │       │  training, eval,     │       │  stores results,     │
+│  compare models     │       │  and deployment      │       │  alerts on fraud     │
+└─────────────────────┘       └─────────────────────┘       └─────────────────────┘
+         │                              ▲                            ▲
+         │  Promotes config via:        │                            │
+         │  • Parameter Store           │  Deploys model to         │
+         │  • S3 config YAML            │  SageMaker endpoint       │
+         │  • Step Functions trigger     │                            │
+         └──────────────────────────────┘                            │
+                                        └────────────────────────────┘
+```
+
+**How the flows connect:**
+1. **Experiment → Training:** Data scientists use the Experiment Flow to find optimal hyperparameters and model configurations. When satisfied, they promote the winning config to Parameter Store (`/fraud-detection/hyperparameters/*`) and S3 (`s3://fraud-detection-config/production-model-config.yaml`), optionally triggering the Training Flow via Step Functions.
+2. **Training → Inference:** The Training Flow picks up the promoted configuration, trains a new model, evaluates it, and deploys it to a SageMaker endpoint. The Inference Flow uses that endpoint to score daily transactions.
+
+### Experiment Flow (SageMaker Studio)
+
+A Python-based experimentation toolkit for data scientists to explore, tune, and evaluate fraud detection models in SageMaker Studio. Located in [`ml-experimentation-workflow/`](./ml-experimentation-workflow/).
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   SageMaker Studio                          │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
+│  │  Experiment   │  │ Hyperparameter│  │    Algorithm     │  │
+│  │  Tracking     │  │   Tuning      │  │   Comparison     │  │
+│  └──────┬───────┘  └──────┬───────┘  └───────┬──────────┘  │
+│         │                 │                   │             │
+│  ┌──────┴───────┐  ┌──────┴───────┐          │             │
+│  │   Feature     │  │    Model     │←─────────┘             │
+│  │ Engineering   │  │  Evaluation  │                        │
+│  └──────────────┘  └──────┬───────┘                        │
+│                           │                                 │
+│                  ┌────────┴─────────┐                       │
+│                  │    Production     │                       │
+│                  │   Integration     │                       │
+│                  └────────┬─────────┘                       │
+└───────────────────────────┼─────────────────────────────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              ▼             ▼             ▼
+     ┌──────────────┐ ┌─────────┐ ┌──────────────┐
+     │  Parameter   │ │   S3    │ │Step Functions │
+     │    Store     │ │ Config  │ │  Pipeline     │
+     └──────────────┘ └─────────┘ └──────────────┘
+              │             │             │
+              └─────────────┼─────────────┘
+                            ▼
+              ┌──────────────────────────┐
+              │  Production Training     │
+              │  Pipeline (Weekly)       │
+              └──────────────────────────┘
+```
+
+**Modules:**
+- **ExperimentTracker**: Structured experiment tracking with metrics and metadata
+- **HyperparameterTuner**: Grid, random, and Bayesian hyperparameter search
+- **AlgorithmComparator**: Side-by-side algorithm comparison with statistical analysis
+- **FeatureEngineer**: Feature engineering and selection utilities
+- **ModelEvaluator**: Comprehensive model evaluation with multiple metrics
+- **ProductionIntegrator**: Validates and promotes winning configs to production
+- **ABTestingManager**: A/B testing support for model comparison in production
+
+When a data scientist finds a better model configuration, the Production Integration module validates the hyperparameters, backs up current values, writes new parameters to Parameter Store, generates a production config in S3, and optionally triggers the production training pipeline via Step Functions.
+
+See the [ML Experimentation Workflow README](./ml-experimentation-workflow/README.md) for setup instructions, usage examples, and module details.
 
 ### Training Pipeline (Standard Workflow - Weekly)
 Trains fraud detection models on historical transaction data and deploys them to SageMaker endpoints.
@@ -83,6 +159,18 @@ Scores transactions for fraud risk, stores results in DynamoDB, and alerts on hi
 
 ## System Components
 
+### ML Experimentation Modules (Python)
+
+Located in `ml-experimentation-workflow/src/`:
+
+- **ExperimentTracker**: Structured experiment tracking with metrics and metadata
+- **HyperparameterTuner**: Grid, random, and Bayesian hyperparameter search
+- **AlgorithmComparator**: Side-by-side algorithm comparison
+- **FeatureEngineer**: Feature engineering and selection utilities
+- **ModelEvaluator**: Comprehensive model evaluation
+- **ProductionIntegrator**: Promotes winning configs to production pipeline
+- **ABTestingManager**: A/B testing for model comparison
+
 ### Lambda Handlers (Kotlin)
 
 All handlers extend the CEAP `WorkflowLambdaHandler` base class:
@@ -101,6 +189,7 @@ All handlers extend the CEAP `WorkflowLambdaHandler` base class:
 
 ### AWS Services
 
+- **SageMaker Studio**: Interactive ML experimentation environment (Experiment Flow)
 - **Step Functions**: Workflow orchestration (Standard for training, Express for inference)
 - **SageMaker**: Model training and real-time inference endpoints
 - **Lambda**: Serverless compute for workflow stages
@@ -110,6 +199,7 @@ All handlers extend the CEAP `WorkflowLambdaHandler` base class:
 - **SNS**: Alerting and notifications
 - **EventBridge**: Scheduled workflow triggers
 - **CloudWatch**: Logging, metrics, and alarms
+- **Systems Manager Parameter Store**: Hyperparameter promotion from experimentation to production
 
 ## Prerequisites
 
@@ -117,7 +207,7 @@ All handlers extend the CEAP `WorkflowLambdaHandler` base class:
 
 - **Java 11+**: For Kotlin/Gradle builds
 - **Gradle 7.4+**: Build automation
-- **Python 3.9+**: For Glue scripts and testing
+- **Python 3.9+**: For Glue scripts, testing, and ML experimentation workflow
 - **AWS CLI v2**: AWS service interaction
 - **AWS CDK 2.x**: Infrastructure deployment
 
@@ -562,51 +652,6 @@ These fixes are tracked in `.kiro/steering/infrastructure-prerequisites.md` for 
 - Use S3 Intelligent-Tiering for infrequently accessed data
 - Enable DynamoDB auto-scaling to match actual load
 - Use Lambda reserved concurrency to avoid over-provisioning
-
----
-
-## ML Experimentation Workflow
-
-A Python-based experimentation toolkit for data scientists to explore, tune, and evaluate fraud detection models in SageMaker Studio. It provides structured experiment tracking, hyperparameter tuning (grid, random, Bayesian), algorithm comparison, feature engineering, and a promotion path to push winning configurations into the production pipeline.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   SageMaker Studio                          │
-│                                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │  Experiment   │  │ Hyperparameter│  │    Algorithm     │  │
-│  │  Tracking     │  │   Tuning      │  │   Comparison     │  │
-│  └──────┬───────┘  └──────┬───────┘  └───────┬──────────┘  │
-│         │                 │                   │             │
-│  ┌──────┴───────┐  ┌──────┴───────┐          │             │
-│  │   Feature     │  │    Model     │←─────────┘             │
-│  │ Engineering   │  │  Evaluation  │                        │
-│  └──────────────┘  └──────┬───────┘                        │
-│                           │                                 │
-│                  ┌────────┴─────────┐                       │
-│                  │    Production     │                       │
-│                  │   Integration     │                       │
-│                  └────────┬─────────┘                       │
-└───────────────────────────┼─────────────────────────────────┘
-                            │
-              ┌─────────────┼─────────────┐
-              ▼             ▼             ▼
-     ┌──────────────┐ ┌─────────┐ ┌──────────────┐
-     │  Parameter   │ │   S3    │ │Step Functions │
-     │    Store     │ │ Config  │ │  Pipeline     │
-     └──────────────┘ └─────────┘ └──────────────┘
-              │             │             │
-              └─────────────┼─────────────┘
-                            ▼
-              ┌──────────────────────────┐
-              │  Production Training     │
-              │  Pipeline (Weekly)       │
-              └──────────────────────────┘
-```
-
-When a data scientist finds a better model configuration, the Production Integration module validates the hyperparameters, backs up current values, writes new parameters to Parameter Store, generates a production config in S3, and optionally triggers the production training pipeline via Step Functions.
-
-See the [ML Experimentation Workflow README](./ml-experimentation-workflow/README.md) for setup instructions, usage examples, and module details.
 
 ---
 

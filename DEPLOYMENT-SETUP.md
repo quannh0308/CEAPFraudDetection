@@ -1,12 +1,13 @@
 # Deployment Setup Guide for quannh0308
 
-This guide provides step-by-step instructions for deploying the Fraud Detection ML Pipeline to your AWS account.
+This guide provides step-by-step instructions for deploying the Fraud Detection ML Pipeline to your AWS account. The system consists of three flows: an ML experimentation environment (SageMaker Studio), a weekly training pipeline, and a daily inference pipeline.
 
 ## Prerequisites
 
 - AWS CLI installed and configured with your credentials
-- AWS account with appropriate permissions (SageMaker, S3, Lambda, Step Functions, DynamoDB, SNS, Glue)
+- AWS account with appropriate permissions (SageMaker, SageMaker Studio, S3, Lambda, Step Functions, DynamoDB, SNS, Glue, Systems Manager)
 - Kaggle account to download the dataset
+- Python 3.9+ (for ML experimentation workflow)
 
 ## Step 1: Download the Kaggle Dataset
 
@@ -120,7 +121,39 @@ aws s3 mb s3://fraud-detection-metrics --region us-east-1
 - Creates SNS topics
 - Sets up EventBridge schedule (daily)
 
-## Step 6: Trigger Training Pipeline (First Run)
+## Step 6: Deploy ML Experimentation Environment (Optional)
+
+The experimentation flow provides a SageMaker Studio environment for data scientists to explore, tune, and evaluate fraud detection models before promoting configurations to the production training pipeline.
+
+### Install Python Dependencies
+
+```bash
+cd ml-experimentation-workflow
+pip install -r requirements.txt
+```
+
+### Deploy SageMaker Studio via CDK
+
+The CDK stack at `ml-experimentation-workflow/infrastructure/` provisions the SageMaker Studio domain, user profile, and associated IAM roles.
+
+```bash
+cd ml-experimentation-workflow/infrastructure
+./deploy.sh
+```
+
+**What this does:**
+- Creates a SageMaker Studio domain and user profile
+- Configures IAM roles for notebook access to S3, Parameter Store, and Step Functions
+- Sets up the experimentation environment with access to production data buckets
+
+**Created Resources:**
+- SageMaker Studio domain and user profile
+- IAM roles for experimentation access
+- Parameter Store paths: `/fraud-detection/hyperparameters/*`
+
+> **Note:** The experimentation environment is optional for running the training and inference pipelines. It is used by data scientists to find optimal model configurations before promoting them to production.
+
+## Step 7: Trigger Training Pipeline (First Run)
 
 ```bash
 # Start the training workflow manually
@@ -141,7 +174,7 @@ aws stepfunctions describe-execution \
 
 **Expected duration:** 2-4 hours (model training takes time)
 
-## Step 7: Prepare Daily Transaction Batch
+## Step 8: Prepare Daily Transaction Batch
 
 Once training completes and deploys a model, you can run inference:
 
@@ -161,7 +194,7 @@ aws stepfunctions start-execution \
 
 **Expected duration:** 5-30 minutes
 
-## Step 8: Monitor and Verify
+## Step 9: Monitor and Verify
 
 ### Check CloudWatch Logs
 
@@ -246,6 +279,10 @@ aws s3 ls s3://fraud-detection-data-quannh0308-20260214/
 aws cloudformation delete-stack --stack-name FraudDetectionTraining-dev
 aws cloudformation delete-stack --stack-name FraudDetectionInference-dev
 
+# Delete SageMaker Studio resources (if deployed)
+cd ml-experimentation-workflow/infrastructure
+# Follow CDK destroy instructions in ml-experimentation-workflow/README.md
+
 # Delete S3 buckets (after emptying them)
 aws s3 rm s3://fraud-detection-data-quannh0308-20260214 --recursive
 aws s3 rb s3://fraud-detection-data-quannh0308-20260214
@@ -262,6 +299,8 @@ After successful deployment:
 3. Run inference pipeline with sample data
 4. Check DynamoDB for fraud scores
 5. Subscribe to SNS alerts
+6. (Optional) Deploy the experimentation environment and run a notebook experiment
+7. (Optional) Use the experimentation workflow to tune hyperparameters and promote to production
 
 ## Questions?
 
