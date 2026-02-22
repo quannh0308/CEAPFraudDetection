@@ -2,7 +2,28 @@
 Experiment tracking module for ML experimentation workflow.
 
 This module provides the ExperimentTracker class for logging and versioning
-experiments using SageMaker Experiments.
+experiments using SageMaker Experiments. It supports creating experiment runs
+with unique IDs, logging hyperparameters and metrics, uploading artifacts to
+S3, and querying past experiments with flexible filters.
+
+Key capabilities:
+    - Create experiment runs with unique IDs and automatic timestamps
+    - Log hyperparameters, performance metrics, and model artifacts
+    - Query experiments by date range, metric thresholds, or hyperparameter values
+    - Integrate with SageMaker Experiments for native AWS tracking
+
+Example:
+    from experiment_tracking import ExperimentTracker
+
+    tracker = ExperimentTracker()
+    experiment_id = tracker.start_experiment(
+        experiment_name="fraud-detection-optimization",
+        algorithm="xgboost",
+        dataset_version="v1.2.3",
+    )
+    tracker.log_parameters(experiment_id, {"max_depth": 7, "eta": 0.15})
+    tracker.log_metrics(experiment_id, {"accuracy": 0.961, "auc_roc": 0.95})
+    tracker.close_experiment(experiment_id)
 """
 
 import boto3
@@ -43,7 +64,11 @@ class ExperimentTracker:
         Initialize ExperimentTracker with SageMaker session.
         
         Args:
-            region_name: AWS region name for SageMaker session
+            region_name: AWS region name for SageMaker session.
+        
+        Example:
+            tracker = ExperimentTracker()
+            tracker = ExperimentTracker(region_name='us-west-2')
         """
         if SAGEMAKER_AVAILABLE and sagemaker is not None:
             self.sagemaker_session = sagemaker.Session(boto3.Session(region_name=region_name))
@@ -357,7 +382,10 @@ class ExperimentTracker:
         Close an experiment run and clean up resources.
         
         Args:
-            experiment_id: Unique experiment ID to close
+            experiment_id: Unique experiment ID to close.
+        
+        Example:
+            tracker.close_experiment(experiment_id)
         """
         if experiment_id in self._active_runs:
             run = self._active_runs[experiment_id]
