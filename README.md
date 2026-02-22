@@ -171,10 +171,29 @@ Located in `ml-experimentation-workflow/src/`:
 - **ProductionIntegrator**: Promotes winning configs to production pipeline
 - **ABTestingManager**: A/B testing for model comparison
 
+### ML Experimentation Notebooks
+
+Located in `ml-experimentation-workflow/notebooks/`:
+
+- **01_data_exploration.ipynb**: Data loading, schema inspection, feature distributions, class imbalance analysis
+- **02_hyperparameter_tuning.ipynb**: Grid search, random search, and SageMaker Automatic Model Tuning
+- **03_algorithm_comparison.ipynb**: XGBoost vs LightGBM vs Random Forest vs Neural Network comparison
+- **04_feature_engineering.ipynb**: Time/amount feature creation, feature selection, importance analysis
+- **05_production_promotion.ipynb**: Model evaluation, production promotion, and A/B testing workflow
+- **template.ipynb**: Pre-configured notebook template with experiment tracking and production integration helpers
+
+### ML Experimentation Infrastructure (CDK/Python)
+
+Located in `ml-experimentation-workflow/infrastructure/`:
+
+- **sagemaker_studio_stack.py**: CDK stack that provisions SageMaker Studio Domain, IAM execution role, S3 config bucket with lifecycle policies, and Kernel Gateway (ml.t3.medium, Data Science 1.0 image)
+- **deploy.sh**: Deployment script for the SageMaker Studio environment
+
 ### Lambda Handlers (Kotlin)
 
 All handlers extend the CEAP `WorkflowLambdaHandler` base class:
 
+- **DataPrepHandler**: Loads CSV dataset, splits into train/validation/test, writes to S3
 - **TrainHandler**: Orchestrates SageMaker training jobs
 - **EvaluateHandler**: Evaluates model performance on test data
 - **DeployHandler**: Deploys models to production endpoints
@@ -185,16 +204,18 @@ All handlers extend the CEAP `WorkflowLambdaHandler` base class:
 
 ### Glue Jobs (Python)
 
-- **data-prep.py**: PySpark script for data preparation, splitting, and Parquet conversion
+- **data-prep.py**: PySpark script for data preparation, splitting, and Parquet conversion (deprecated — replaced by Lambda DataPrepHandler)
 
 ### AWS Services
 
 - **SageMaker Studio**: Interactive ML experimentation environment (Experiment Flow)
+- **SageMaker Experiments**: Experiment tracking and versioning for the experimentation workflow
+- **SageMaker Endpoints**: Model deployment for training pipeline and A/B testing
+- **SageMaker Automatic Model Tuning**: Bayesian hyperparameter optimization (Experiment Flow)
 - **Step Functions**: Workflow orchestration (Standard for training, Express for inference)
-- **SageMaker**: Model training and real-time inference endpoints
 - **Lambda**: Serverless compute for workflow stages
-- **Glue**: Distributed data processing with PySpark
-- **S3**: Stage-to-stage data orchestration and storage
+- **Glue**: Distributed data processing with PySpark (deprecated)
+- **S3**: Stage-to-stage data orchestration, model artifacts, config files, and backups
 - **DynamoDB**: Persistent storage for scored transactions
 - **SNS**: Alerting and notifications
 - **EventBridge**: Scheduled workflow triggers
@@ -292,27 +313,70 @@ aws s3 mb s3://fraud-detection-data-quannh0308-20260214
 aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data-quannh0308-20260214/
 ```
 
+### 6. Set Up ML Experimentation Workflow (Python)
+
+```bash
+cd ml-experimentation-workflow
+pip install -r requirements.txt
+```
+
+This installs the Python dependencies for the experimentation modules: boto3, sagemaker, pandas, numpy, scikit-learn, xgboost, lightgbm, matplotlib, seaborn, pyyaml, hypothesis, pytest, moto.
+
+To run the experimentation test suite:
+
+```bash
+# From ml-experimentation-workflow/
+pytest tests/ -v --tb=short
+```
+
+See the [ML Experimentation Workflow README](./ml-experimentation-workflow/README.md) for detailed usage and notebook walkthroughs.
+
+### 7. Set Environment Variables for Deployment
+
+Both deployment scripts require these environment variables:
+
+```bash
+export AWS_REGION=us-east-1
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export ENVIRONMENT=dev          # defaults to "dev" if not set
+export BUCKET_SUFFIX=your-unique-suffix  # defaults to "quannh0308-20260214" if not set
+```
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AWS_REGION` | Yes | — | AWS region for deployment (e.g., `us-east-1`) |
+| `AWS_ACCOUNT_ID` | Yes | — | Your 12-digit AWS account ID |
+| `ENVIRONMENT` | No | `dev` | Environment name used in resource naming |
+| `BUCKET_SUFFIX` | No | `quannh0308-20260214` | Unique suffix appended to S3 bucket names |
+
 ## Deployment Guide
 
 ### Training Pipeline Deployment
 
-The training pipeline uses a Standard workflow with Glue and Lambda stages.
+The training pipeline uses a Standard workflow with Lambda stages.
+
+**Required environment variables** (see Step 7 in Setup Instructions):
 
 ```bash
-# Deploy training pipeline infrastructure
-./deploy-training-pipeline.sh
-
-# This script performs:
-# 1. Builds Gradle project
-# 2. Packages Lambda functions as fat JARs
-# 3. Uploads Glue script to S3
-# 4. Deploys CDK stack (TrainingPipelineStack)
+export AWS_REGION=us-east-1
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export ENVIRONMENT=dev
+export BUCKET_SUFFIX=your-unique-suffix
 ```
 
+Then run:
+
+```bash
+./deploy-training-pipeline.sh
+```
+
+The script validates prerequisites (AWS CLI, CDK, Java 17+, Gradle), builds the project, packages Lambda fat JARs, uploads the Glue script to S3, bootstraps CDK if needed, and deploys the `FraudDetectionTrainingPipeline-{ENVIRONMENT}` stack.
+
 **Created Resources:**
-- Step Functions workflow: `FraudDetectionTrainingWorkflow`
+- Step Functions workflow: `FraudDetectionTraining-{ENVIRONMENT}`
 - Lambda functions: `fraud-detection-dataprep-handler`, `fraud-detection-train-handler`, `fraud-detection-evaluate-handler`, `fraud-detection-deploy-handler`
-- S3 buckets: `fraud-detection-workflow-quannh0308-20260214`, `fraud-detection-data-quannh0308-20260214`, `fraud-detection-models-quannh0308-20260214`, `fraud-detection-config-quannh0308-20260214`
+- S3 buckets: `fraud-detection-workflow-{BUCKET_SUFFIX}`, `fraud-detection-data-{BUCKET_SUFFIX}`, `fraud-detection-models-{BUCKET_SUFFIX}`, `fraud-detection-config-{BUCKET_SUFFIX}`
+- Glue scripts bucket: `fraud-detection-glue-scripts-{ENVIRONMENT}-{AWS_ACCOUNT_ID}`
 - EventBridge rule: Weekly trigger (Sunday 2 AM)
 - SNS topic: `fraud-detection-failures`
 
@@ -350,6 +414,30 @@ The inference pipeline uses an Express workflow with all Lambda stages.
 - SNS topics: `fraud-detection-alerts`, `fraud-detection-monitoring`
 - **Note:** The `fraud-detection-metrics` S3 bucket is NOT created by CDK. You must create it manually before deployment (see Prerequisites below).
 - EventBridge rule: Daily trigger (1 AM)
+
+### ML Experimentation Environment Deployment (SageMaker Studio)
+
+The experimentation environment is deployed separately from the training/inference pipelines. It provisions a SageMaker Studio Domain with pre-configured IAM roles and S3 buckets.
+
+```bash
+cd ml-experimentation-workflow/infrastructure
+./deploy.sh
+```
+
+This CDK stack creates:
+- SageMaker Studio Domain (`fraud-detection-experimentation`) with IAM authentication
+- IAM execution role with permissions for S3, SageMaker, Parameter Store, Step Functions, and CloudWatch
+- S3 bucket (`fraud-detection-config`) with versioning, archive lifecycle policies, and backup prefixes
+- Kernel Gateway configured with `ml.t3.medium` and the Data Science 1.0 image
+
+After deployment, the SageMaker Studio URL is printed in the stack outputs. Open it, clone this repo inside Studio, install dependencies (`pip install -r requirements.txt`), and start with any notebook in `notebooks/`.
+
+To tear down:
+
+```bash
+cd ml-experimentation-workflow/infrastructure
+./deploy.sh --destroy
+```
 
 ### Manual Workflow Execution
 
