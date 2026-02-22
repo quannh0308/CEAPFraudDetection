@@ -8,11 +8,11 @@ inclusion: auto
 
 The following S3 buckets are required but NOT created by the CDK stacks. They must be created manually before deployment:
 
-- `fraud-detection-metrics` — Used by MonitorHandler for storing model performance metrics and drift detection baselines. The MonitorHandler reads this from the `METRICS_BUCKET` env var, defaulting to `fraud-detection-metrics` if not set.
+- `fraud-detection-metrics-{BUCKET_SUFFIX}` — Used by MonitorHandler for storing model performance metrics and drift detection baselines. The MonitorHandler reads this from the `METRICS_BUCKET` env var. `{BUCKET_SUFFIX}` should match the value used during deployment.
 
 Create it with:
 ```bash
-aws s3 mb s3://fraud-detection-metrics --region us-east-1
+aws s3 mb s3://fraud-detection-metrics-{BUCKET_SUFFIX} --region us-east-1
 ```
 
 ## Environment Variable Mapping
@@ -23,7 +23,7 @@ Lambda handlers read specific env var names. The CDK stack must pass the correct
 |---------|---------|---------|
 | AlertHandler | `FRAUD_ALERT_TOPIC_ARN` | `FRAUD_ALERT_TOPIC_ARN` |
 | MonitorHandler | `MONITORING_ALERT_TOPIC_ARN` | `MONITORING_ALERT_TOPIC_ARN` |
-| MonitorHandler | `METRICS_BUCKET` | Not set in CDK (uses default) |
+| MonitorHandler | `METRICS_BUCKET` | `METRICS_BUCKET` (set to `fraud-detection-metrics-{BUCKET_SUFFIX}`) |
 | StoreHandler | `DYNAMODB_TABLE` | `DYNAMODB_TABLE` |
 
 ## Known Issues Fixed

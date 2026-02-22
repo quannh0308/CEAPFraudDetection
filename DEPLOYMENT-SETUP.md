@@ -37,13 +37,13 @@ mv creditcard.csv kaggle-credit-card-fraud.csv
 
 ```bash
 # Create your unique data bucket
-aws s3 mb s3://fraud-detection-data-quannh0308-20260214
+aws s3 mb s3://fraud-detection-data-{BUCKET_SUFFIX}
 
 # Upload the dataset
-aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data-quannh0308-20260214/
+aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data-{BUCKET_SUFFIX}/
 
 # Verify upload
-aws s3 ls s3://fraud-detection-data-quannh0308-20260214/
+aws s3 ls s3://fraud-detection-data-{BUCKET_SUFFIX}/
 ```
 
 **Expected output:**
@@ -91,10 +91,10 @@ chmod +x deploy-training-pipeline.sh
 - Sets up EventBridge schedule (weekly)
 
 **S3 Buckets Created:**
-- `fraud-detection-data-quannh0308-20260214` (uses your existing bucket)
-- `fraud-detection-workflow-quannh0308-20260214` (created by CDK)
-- `fraud-detection-models-quannh0308-20260214` (created by CDK)
-- `fraud-detection-config-quannh0308-20260214` (created by CDK)
+- `fraud-detection-data-{BUCKET_SUFFIX}` (uses your existing bucket)
+- `fraud-detection-workflow-{BUCKET_SUFFIX}` (created by CDK)
+- `fraud-detection-models-{BUCKET_SUFFIX}` (created by CDK)
+- `fraud-detection-config-{BUCKET_SUFFIX}` (created by CDK)
 
 ## Step 5: Deploy Inference Pipeline
 
@@ -105,7 +105,7 @@ chmod +x deploy-inference-pipeline.sh
 
 **Important:** Before deploying, create the metrics bucket (not managed by CDK):
 ```bash
-aws s3 mb s3://fraud-detection-metrics --region us-east-1
+aws s3 mb s3://fraud-detection-metrics-{BUCKET_SUFFIX} --region us-east-1
 ```
 
 ```bash
@@ -160,8 +160,8 @@ cd ml-experimentation-workflow/infrastructure
 aws stepfunctions start-execution \
   --state-machine-arn $(aws stepfunctions list-state-machines --query "stateMachines[?name=='FraudDetectionTraining-dev'].stateMachineArn" --output text) \
   --input '{
-    "datasetS3Path": "s3://fraud-detection-data-quannh0308-20260214/kaggle-credit-card-fraud.csv",
-    "outputPrefix": "s3://fraud-detection-data-quannh0308-20260214/prepared/",
+    "datasetS3Path": "s3://fraud-detection-data-{BUCKET_SUFFIX}/kaggle-credit-card-fraud.csv",
+    "outputPrefix": "s3://fraud-detection-data-{BUCKET_SUFFIX}/prepared/",
     "trainSplit": 0.70,
     "validationSplit": 0.15,
     "testSplit": 0.15
@@ -181,13 +181,13 @@ Once training completes and deploys a model, you can run inference:
 ```bash
 # Upload a sample transaction batch
 aws s3 cp examples/transaction-batch.json \
-  s3://fraud-detection-data-quannh0308-20260214/daily-batches/2024-01-15.json
+  s3://fraud-detection-data-{BUCKET_SUFFIX}/daily-batches/2024-01-15.json
 
 # Start inference workflow
 aws stepfunctions start-execution \
   --state-machine-arn $(aws stepfunctions list-state-machines --query "stateMachines[?name=='FraudDetectionInference-dev'].stateMachineArn" --output text) \
   --input '{
-    "transactionBatchPath": "s3://fraud-detection-data-quannh0308-20260214/daily-batches/2024-01-15.json",
+    "transactionBatchPath": "s3://fraud-detection-data-{BUCKET_SUFFIX}/daily-batches/2024-01-15.json",
     "batchDate": "2024-01-15"
   }'
 ```
@@ -251,7 +251,7 @@ aws sns subscribe \
 
 **Solution:** Verify dataset is uploaded correctly:
 ```bash
-aws s3 ls s3://fraud-detection-data-quannh0308-20260214/
+aws s3 ls s3://fraud-detection-data-{BUCKET_SUFFIX}/
 # Should show kaggle-credit-card-fraud.csv
 ```
 
@@ -284,8 +284,8 @@ cd ml-experimentation-workflow/infrastructure
 # Follow CDK destroy instructions in ml-experimentation-workflow/README.md
 
 # Delete S3 buckets (after emptying them)
-aws s3 rm s3://fraud-detection-data-quannh0308-20260214 --recursive
-aws s3 rb s3://fraud-detection-data-quannh0308-20260214
+aws s3 rm s3://fraud-detection-data-{BUCKET_SUFFIX} --recursive
+aws s3 rb s3://fraud-detection-data-{BUCKET_SUFFIX}
 
 # Delete other buckets created by CDK
 aws s3 ls | grep fraud-detection

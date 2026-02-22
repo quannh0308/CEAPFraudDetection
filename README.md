@@ -307,10 +307,10 @@ This compiles all Kotlin modules and runs tests:
 
 ```bash
 # Create data bucket with your unique identifier
-aws s3 mb s3://fraud-detection-data-quannh0308-20260214
+aws s3 mb s3://fraud-detection-data-{BUCKET_SUFFIX}
 
 # Upload Kaggle dataset
-aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data-quannh0308-20260214/
+aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data-{BUCKET_SUFFIX}/
 ```
 
 ### 6. Set Up ML Experimentation Workflow (Python)
@@ -388,7 +388,7 @@ The following resources are NOT managed by CDK and must be created manually:
 
 ```bash
 # Create metrics bucket (used by MonitorHandler for drift detection)
-aws s3 mb s3://fraud-detection-metrics --region us-east-1
+aws s3 mb s3://fraud-detection-metrics-{BUCKET_SUFFIX} --region us-east-1
 ```
 
 **Important:** Without this bucket, the MonitorStage will fail with `NoSuchBucketException`.
@@ -412,7 +412,7 @@ The inference pipeline uses an Express workflow with all Lambda stages.
 - Lambda functions: `fraud-detection-score-handler`, `fraud-detection-store-handler`, `fraud-detection-alert-handler`, `fraud-detection-monitor-handler`
 - DynamoDB table: `FraudScores` (with `BatchDateIndex` GSI)
 - SNS topics: `fraud-detection-alerts`, `fraud-detection-monitoring`
-- **Note:** The `fraud-detection-metrics` S3 bucket is NOT created by CDK. You must create it manually before deployment (see Prerequisites below).
+- **Note:** The `fraud-detection-metrics-{BUCKET_SUFFIX}` S3 bucket is NOT created by CDK. You must create it manually before deployment (see Prerequisites below).
 - EventBridge rule: Daily trigger (1 AM)
 
 ### ML Experimentation Environment Deployment (SageMaker Studio)
@@ -448,8 +448,8 @@ cd ml-experimentation-workflow/infrastructure
 aws stepfunctions start-execution \
   --state-machine-arn arn:aws:states:us-east-1:{account-id}:stateMachine:FraudDetectionTrainingWorkflow \
   --input '{
-    "datasetS3Path": "s3://fraud-detection-data-quannh0308-20260214/kaggle-credit-card-fraud.csv",
-    "outputPrefix": "s3://fraud-detection-data-quannh0308-20260214/prepared/",
+    "datasetS3Path": "s3://fraud-detection-data-{BUCKET_SUFFIX}/kaggle-credit-card-fraud.csv",
+    "outputPrefix": "s3://fraud-detection-data-{BUCKET_SUFFIX}/prepared/",
     "trainSplit": 0.70,
     "validationSplit": 0.15,
     "testSplit": 0.15
@@ -464,7 +464,7 @@ aws stepfunctions describe-execution \
 
 ```bash
 # Prepare daily transaction batch
-aws s3 cp daily-transactions.json s3://fraud-detection-data-quannh0308-20260214/daily-batches/2024-01-15.json
+aws s3 cp daily-transactions.json s3://fraud-detection-data-{BUCKET_SUFFIX}/daily-batches/2024-01-15.json
 ```
 
 > **Important:** The transaction batch must be a JSON array of `Transaction` objects. Each object must have: `id` (string), `timestamp` (long), `amount` (double), `merchantCategory` (string), `features` (map of string to double with keys Time, V1-V28, Amount). See `examples/transaction-batch.json` for the correct format.
@@ -474,7 +474,7 @@ aws s3 cp daily-transactions.json s3://fraud-detection-data-quannh0308-20260214/
 aws stepfunctions start-execution \
   --state-machine-arn arn:aws:states:us-east-1:{account-id}:stateMachine:FraudDetectionInferenceWorkflow \
   --input '{
-    "transactionBatchPath": "s3://fraud-detection-data-quannh0308-20260214/daily-batches/2024-01-15.json",
+    "transactionBatchPath": "s3://fraud-detection-data-{BUCKET_SUFFIX}/daily-batches/2024-01-15.json",
     "batchDate": "2024-01-15"
   }'
 ```
@@ -574,7 +574,7 @@ Check daily metrics:
 
 ```bash
 # Download metrics for a specific date
-aws s3 cp s3://fraud-detection-metrics/metrics/2024-01-15.json ./
+aws s3 cp s3://fraud-detection-metrics-{BUCKET_SUFFIX}/metrics/2024-01-15.json ./
 
 # View metrics
 cat 2024-01-15.json | jq '.'
@@ -607,7 +607,7 @@ cat 2024-01-15.json | jq '.'
 **Resolution:**
 1. Verify dataset integrity: `wc -l kaggle-credit-card-fraud.csv`
 2. Re-download dataset from Kaggle
-3. Re-upload to S3: `aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data-quannh0308-20260214/`
+3. Re-upload to S3: `aws s3 cp kaggle-credit-card-fraud.csv s3://fraud-detection-data-{BUCKET_SUFFIX}/`
 
 #### Issue: Endpoint deployment timeout
 
@@ -702,7 +702,7 @@ Issues discovered during first-time deployment that new engineers should be awar
 | Env var mismatch (MonitorHandler) | `MONITORING_ALERT_TOPIC_ARN` not found | CDK key corrected to match handler code |
 | Env var mismatch (StoreHandler) | `DYNAMODB_TABLE` not found, DDB writes fail silently | CDK key corrected to match handler code |
 | Missing metrics bucket | MonitorHandler `NoSuchBucketException` | Manual `aws s3 mb` required (not in CDK) |
-| Missing metrics bucket permissions | MonitorHandler 403 on metrics bucket | Added S3 policy for `fraud-detection-metrics` |
+| Missing metrics bucket permissions | MonitorHandler 403 on metrics bucket | Added S3 policy for `fraud-detection-metrics-{BUCKET_SUFFIX}` |
 | Bad example data | `examples/transaction-batch.json` had comment object | Removed non-Transaction JSON object from array |
 
 These fixes are tracked in `.kiro/steering/infrastructure-prerequisites.md` for ongoing reference.

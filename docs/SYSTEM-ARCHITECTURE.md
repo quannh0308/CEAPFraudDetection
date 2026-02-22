@@ -62,7 +62,7 @@ The CEAP Fraud Detection Platform is a state-of-the-art, production-grade ML sys
    - `fraud-detection-workflow-{account}`: Workflow orchestration data
    - `fraud-detection-models`: Trained model artifacts
    - `fraud-detection-config`: Configuration files and endpoint metadata
-   - `fraud-detection-metrics`: Performance metrics and monitoring data
+   - `fraud-detection-metrics-{BUCKET_SUFFIX}`: Performance metrics and monitoring data
 
 2. **DynamoDB Tables**:
    - `FraudScores`: Scored transaction storage
@@ -236,7 +236,7 @@ Production pipeline trains with optimized settings
    - Subscribers: Email, SMS, Lambda
 
 3. **S3 Metrics Storage**:
-   - Daily metrics: `s3://fraud-detection-metrics/metrics/{date}.json`
+   - Daily metrics: `s3://fraud-detection-metrics-{BUCKET_SUFFIX}/metrics/{date}.json`
    - Retention: 90 days
    - Used for baseline calculation and trend analysis
 

@@ -388,7 +388,7 @@ INPUT: EventBridge Schedule Trigger (Daily at 1 AM)
 │     Send monitoring alert via SNS                                          │
 │                                                                              │
 │ SIDE EFFECT (S3):                                                           │
-│   • s3://fraud-detection-metrics/metrics/2024-01-15.json                  │
+│   • s3://fraud-detection-metrics-{BUCKET_SUFFIX}/metrics/2024-01-15.json                  │
 │   • Retained for 90 days for trend analysis                               │
 │                                                                              │
 │ SIDE EFFECT (SNS - if drift detected):                                     │

@@ -1,6 +1,6 @@
 {
   "comment": "Example daily metrics written by MonitorHandler",
-  "description": "This file is written to s3://fraud-detection-metrics/metrics/{batchDate}.json by MonitorHandler for historical tracking",
+  "description": "This file is written to s3://fraud-detection-metrics-{BUCKET_SUFFIX}/metrics/{batchDate}.json by MonitorHandler for historical tracking",
   
   "batchDate": "2024-01-15",
   "avgFraudScore": 0.4573,

@@ -9,8 +9,8 @@ Experiment (SageMaker Studio) → Train (Weekly Pipeline) → Infer (Daily Pipel
 ```
 
 You already have:
-- ✅ Dataset uploaded: `s3://fraud-detection-data-quannh0308-20260214/kaggle-credit-card-fraud.csv`
-- ✅ Code configured to use your bucket suffix: `quannh0308-20260214`
+- ✅ Dataset uploaded: `s3://fraud-detection-data-{BUCKET_SUFFIX}/kaggle-credit-card-fraud.csv`
+- ✅ Code configured to use your bucket suffix: `{BUCKET_SUFFIX}`
 - ✅ All tests passing (79/79)
 
 ## Deploy in 3 Commands
@@ -20,7 +20,7 @@ You already have:
 ```bash
 export AWS_REGION=us-east-1
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-export BUCKET_SUFFIX=quannh0308-20260214
+export BUCKET_SUFFIX={BUCKET_SUFFIX}
 export ENVIRONMENT=dev
 ```
 
@@ -33,7 +33,7 @@ export ENVIRONMENT=dev
 **Wait time:** 10-15 minutes
 
 **What gets created:**
-- S3 buckets: `fraud-detection-{workflow,models,config}-quannh0308-20260214`
+- S3 buckets: `fraud-detection-{workflow,models,config}-{BUCKET_SUFFIX}`
 - Glue job: `fraud-detection-data-prep`
 - Lambda functions: train-handler, evaluate-handler, deploy-handler
 - Step Functions: FraudDetectionTrainingWorkflow
@@ -92,8 +92,8 @@ The notebook walks through experiment tracking, hyperparameter tuning, algorithm
 aws stepfunctions start-execution \
   --state-machine-arn $(aws stepfunctions list-state-machines --query "stateMachines[?name=='FraudDetectionTrainingPipeline-dev'].stateMachineArn" --output text) \
   --input '{
-    "datasetS3Path": "s3://fraud-detection-data-quannh0308-20260214/kaggle-credit-card-fraud.csv",
-    "outputPrefix": "s3://fraud-detection-data-quannh0308-20260214/prepared/",
+    "datasetS3Path": "s3://fraud-detection-data-{BUCKET_SUFFIX}/kaggle-credit-card-fraud.csv",
+    "outputPrefix": "s3://fraud-detection-data-{BUCKET_SUFFIX}/prepared/",
     "trainSplit": 0.70,
     "validationSplit": 0.15,
     "testSplit": 0.15
@@ -121,13 +121,13 @@ aws stepfunctions list-executions \
 ```bash
 # Upload sample transaction batch
 aws s3 cp examples/transaction-batch.json \
-  s3://fraud-detection-data-quannh0308-20260214/daily-batches/$(date +%Y-%m-%d).json
+  s3://fraud-detection-data-{BUCKET_SUFFIX}/daily-batches/$(date +%Y-%m-%d).json
 
 # Start inference workflow
 aws stepfunctions start-execution \
   --state-machine-arn $(aws stepfunctions list-state-machines --query "stateMachines[?name=='FraudDetectionInferencePipeline-dev'].stateMachineArn" --output text) \
   --input "{
-    \"transactionBatchPath\": \"s3://fraud-detection-data-quannh0308-20260214/daily-batches/$(date +%Y-%m-%d).json\",
+    \"transactionBatchPath\": \"s3://fraud-detection-data-{BUCKET_SUFFIX}/daily-batches/$(date +%Y-%m-%d).json\",
     \"batchDate\": \"$(date +%Y-%m-%d)\"
   }"
 ```
@@ -150,7 +150,7 @@ aws logs tail /aws/lambda/fraud-detection-score-handler --follow
 - Check CloudFormation console for detailed errors
 
 ### Training fails?
-- Verify dataset exists: `aws s3 ls s3://fraud-detection-data-quannh0308-20260214/`
+- Verify dataset exists: `aws s3 ls s3://fraud-detection-data-{BUCKET_SUFFIX}/`
 - Check Glue job logs in CloudWatch
 - Ensure SageMaker service limits aren't exceeded
 
@@ -186,17 +186,17 @@ aws cloudformation wait stack-delete-complete --stack-name FraudDetectionInferen
 aws cloudformation wait stack-delete-complete --stack-name FraudDetectionTrainingPipeline-dev
 
 # Delete S3 buckets (must be empty first)
-aws s3 rm s3://fraud-detection-data-quannh0308-20260214 --recursive
-aws s3 rb s3://fraud-detection-data-quannh0308-20260214
+aws s3 rm s3://fraud-detection-data-{BUCKET_SUFFIX} --recursive
+aws s3 rb s3://fraud-detection-data-{BUCKET_SUFFIX}
 
-aws s3 rm s3://fraud-detection-workflow-quannh0308-20260214 --recursive
-aws s3 rb s3://fraud-detection-workflow-quannh0308-20260214
+aws s3 rm s3://fraud-detection-workflow-{BUCKET_SUFFIX} --recursive
+aws s3 rb s3://fraud-detection-workflow-{BUCKET_SUFFIX}
 
-aws s3 rm s3://fraud-detection-models-quannh0308-20260214 --recursive
-aws s3 rb s3://fraud-detection-models-quannh0308-20260214
+aws s3 rm s3://fraud-detection-models-{BUCKET_SUFFIX} --recursive
+aws s3 rb s3://fraud-detection-models-{BUCKET_SUFFIX}
 
-aws s3 rm s3://fraud-detection-config-quannh0308-20260214 --recursive
-aws s3 rb s3://fraud-detection-config-quannh0308-20260214
+aws s3 rm s3://fraud-detection-config-{BUCKET_SUFFIX} --recursive
+aws s3 rb s3://fraud-detection-config-{BUCKET_SUFFIX}
 ```
 
 ## Need Help?

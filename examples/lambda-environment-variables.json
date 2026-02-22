@@ -35,7 +35,7 @@
   
   "MonitorHandler": {
     "MONITORING_ALERT_TOPIC_ARN": "arn:aws:sns:us-east-1:123456789012:fraud-detection-monitoring",
-    "METRICS_BUCKET": "fraud-detection-metrics",
+    "METRICS_BUCKET": "fraud-detection-metrics-{BUCKET_SUFFIX}",
     "description": "SNS topic ARN for drift detection alerts. METRICS_BUCKET is where daily performance metrics are stored."
   },
   

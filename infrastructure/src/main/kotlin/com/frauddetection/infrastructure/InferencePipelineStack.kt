@@ -274,7 +274,7 @@ class InferencePipelineStack(
                 "ENVIRONMENT" to envName,
                 "WORKFLOW_BUCKET" to workflowBucketName,
                 "MONITORING_ALERT_TOPIC_ARN" to monitoringTopic.topicArn,
-                "METRICS_BUCKET" to "fraud-detection-metrics",
+                "METRICS_BUCKET" to "fraud-detection-metrics-$bucketSuffix",
                 "LOG_LEVEL" to "INFO"
             ))
             .logRetention(RetentionDays.ONE_MONTH)
@@ -302,8 +302,8 @@ class InferencePipelineStack(
                     "s3:ListBucket"
                 ))
                 .resources(listOf(
-                    "arn:aws:s3:::fraud-detection-metrics",
-                    "arn:aws:s3:::fraud-detection-metrics/*"
+                    "arn:aws:s3:::fraud-detection-metrics-$bucketSuffix",
+                    "arn:aws:s3:::fraud-detection-metrics-$bucketSuffix/*"
                 ))
                 .build()
         )

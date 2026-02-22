@@ -5,8 +5,8 @@
   "job-name": "fraud-detection-data-prep",
   
   "arguments": {
-    "--dataset_s3_path": "s3://fraud-detection-data-quannh0308-20260214/kaggle-credit-card-fraud.csv",
-    "--output_prefix": "s3://fraud-detection-data-quannh0308-20260214/prepared/",
+    "--dataset_s3_path": "s3://fraud-detection-data-{BUCKET_SUFFIX}/kaggle-credit-card-fraud.csv",
+    "--output_prefix": "s3://fraud-detection-data-{BUCKET_SUFFIX}/prepared/",
     "--train_split": "0.70",
     "--validation_split": "0.15",
     "--test_split": "0.15",

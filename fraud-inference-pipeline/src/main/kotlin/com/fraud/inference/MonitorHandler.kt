@@ -65,7 +65,8 @@ import kotlin.math.abs
 open class MonitorHandler(
     private val metricsS3Client: S3Client = S3Client.builder().build(),
     private val snsClient: SnsClient = SnsClient.builder().build(),
-    private val metricsBucket: String = System.getenv("METRICS_BUCKET") ?: "fraud-detection-metrics",
+    private val metricsBucket: String = System.getenv("METRICS_BUCKET")
+        ?: throw IllegalStateException("METRICS_BUCKET environment variable is required"),
     private val monitoringAlertTopicArn: String = System.getenv("MONITORING_ALERT_TOPIC_ARN")
         ?: throw IllegalStateException("MONITORING_ALERT_TOPIC_ARN environment variable is required")
 ) : WorkflowLambdaHandler() {

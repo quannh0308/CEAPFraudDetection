@@ -46,7 +46,7 @@ Example format for daily transaction batches that are scored by the inference pi
 **Upload to S3:**
 ```bash
 aws s3 cp examples/transaction-batch.json \
-  s3://fraud-detection-data-quannh0308-20260214/daily-batches/2024-01-15.json
+  s3://fraud-detection-data-{BUCKET_SUFFIX}/daily-batches/2024-01-15.json
 ```
 
 ## Lambda Handler Configurations
@@ -95,7 +95,7 @@ Metadata written by DeployHandler and read by ScoreHandler.
 ### daily-metrics.json
 Performance metrics written by MonitorHandler for historical tracking.
 
-**Location:** `s3://fraud-detection-metrics/metrics/{batchDate}.json`
+**Location:** `s3://fraud-detection-metrics-{BUCKET_SUFFIX}/metrics/{batchDate}.json`
 
 **Purpose:** Track fraud score distribution over time and detect model drift.
 
@@ -153,7 +153,7 @@ aws dynamodb query \
   --expression-attribute-values '{":date":{"S":"2024-01-15"}}'
 
 # Check metrics
-aws s3 cp s3://fraud-detection-metrics/metrics/2024-01-15.json ./
+aws s3 cp s3://fraud-detection-metrics-{BUCKET_SUFFIX}/metrics/2024-01-15.json ./
 cat 2024-01-15.json | jq '.'
 ```
 
