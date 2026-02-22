@@ -776,3 +776,244 @@ class TestConfigurationFileManagement:
         parsed = yaml_mod.safe_load(written_body)
         assert parsed['model']['algorithm'] == valid_config['model']['algorithm']
         assert parsed['model']['approved_by'] == valid_config['model']['approved_by']
+
+
+class TestPipelineTrigger:
+    """Test suite for pipeline trigger, status checking, and promotion workflow."""
+
+    @pytest.fixture
+    def mock_boto3_clients(self):
+        """Create mock boto3 clients for SSM, S3, and Step Functions."""
+        with patch('production_integration.boto3.client') as mock_client:
+            mock_ssm = MagicMock()
+            mock_s3 = MagicMock()
+            mock_sfn = MagicMock()
+
+            mock_ssm.exceptions.ParameterNotFound = type(
+                'ParameterNotFound', (Exception,), {}
+            )
+            mock_sfn.exceptions.ClientError = type(
+                'ClientError', (Exception,), {}
+            )
+            mock_s3.exceptions.NoSuchKey = type(
+                'NoSuchKey', (Exception,), {}
+            )
+
+            def client_factory(service_name, **kwargs):
+                if service_name == 'ssm':
+                    return mock_ssm
+                elif service_name == 's3':
+                    return mock_s3
+                elif service_name == 'stepfunctions':
+                    return mock_sfn
+                return MagicMock()
+
+            mock_client.side_effect = client_factory
+            yield {'ssm': mock_ssm, 's3': mock_s3, 'sfn': mock_sfn}
+
+    @pytest.fixture
+    def integrator(self, mock_boto3_clients):
+        """Create ProductionIntegrator instance with mocked dependencies."""
+        return ProductionIntegrator()
+
+    @pytest.fixture
+    def integrator_with_tracker(self, mock_boto3_clients):
+        """Create ProductionIntegrator with a mock ExperimentTracker."""
+        mock_tracker = MagicMock()
+        mock_tracker.start_experiment.return_value = 'promotion-exp-001'
+        return ProductionIntegrator(experiment_tracker=mock_tracker)
+
+    @pytest.fixture
+    def valid_hyperparameters(self):
+        """Valid hyperparameters fixture."""
+        return {
+            'objective': 'binary:logistic',
+            'num_round': 150,
+            'max_depth': 7,
+            'eta': 0.15,
+            'subsample': 0.8,
+            'colsample_bytree': 0.8,
+        }
+
+    @pytest.fixture
+    def sample_metrics(self):
+        """Sample metrics fixture."""
+        return {
+            'accuracy': 0.96,
+            'precision': 0.92,
+            'recall': 0.88,
+        }
+
+    # --- Pipeline trigger tests ---
+
+    def test_trigger_returns_execution_arn(self, integrator, mock_boto3_clients):
+        """Test pipeline trigger returns the execution ARN on success."""
+        mock_sfn = mock_boto3_clients['sfn']
+        expected_arn = 'arn:aws:states:us-east-1:123456789012:execution:fraud-detection-training-pipeline:experiment-exp-001-20240115-120000'
+        mock_sfn.start_execution.return_value = {'executionArn': expected_arn}
+
+        result = integrator.trigger_production_pipeline('exp-001')
+
+        assert result == expected_arn
+
+    def test_trigger_passes_correct_experiment_id(self, integrator, mock_boto3_clients):
+        """Test trigger passes correct experiment ID in execution input."""
+        import json as json_mod
+
+        mock_sfn = mock_boto3_clients['sfn']
+        mock_sfn.start_execution.return_value = {'executionArn': 'arn:test'}
+
+        integrator.trigger_production_pipeline('my-experiment-42')
+
+        call_kwargs = mock_sfn.start_execution.call_args[1]
+        input_data = json_mod.loads(call_kwargs['input'])
+        assert input_data['experimentId'] == 'my-experiment-42'
+        assert input_data['triggeredBy'] == 'experimentation-workflow'
+
+    def test_trigger_execution_name_format(self, integrator, mock_boto3_clients):
+        """Test trigger execution name follows expected format."""
+        mock_sfn = mock_boto3_clients['sfn']
+        mock_sfn.start_execution.return_value = {'executionArn': 'arn:test'}
+
+        integrator.trigger_production_pipeline('exp-001')
+
+        call_kwargs = mock_sfn.start_execution.call_args[1]
+        execution_name = call_kwargs['name']
+        assert execution_name.startswith('experiment-exp-001-')
+        # Verify timestamp portion is 15 chars (YYYYMMDD-HHMMSS)
+        timestamp_part = execution_name[len('experiment-exp-001-'):]
+        assert len(timestamp_part) == 15
+
+    def test_trigger_failure_raises_runtime_error(self, integrator, mock_boto3_clients):
+        """Test trigger failure raises RuntimeError with descriptive message."""
+        mock_sfn = mock_boto3_clients['sfn']
+        mock_sfn.start_execution.side_effect = mock_sfn.exceptions.ClientError(
+            'Execution limit exceeded'
+        )
+
+        with pytest.raises(RuntimeError, match="Failed to trigger production pipeline"):
+            integrator.trigger_production_pipeline('exp-001')
+
+    # --- Pipeline status tests ---
+
+    def test_check_status_returns_correct_fields(self, integrator, mock_boto3_clients):
+        """Test check_pipeline_status returns correct fields for completed execution."""
+        mock_sfn = mock_boto3_clients['sfn']
+        start_date = datetime(2024, 1, 15, 12, 0, 0)
+        stop_date = datetime(2024, 1, 15, 13, 0, 0)
+        mock_sfn.describe_execution.return_value = {
+            'status': 'SUCCEEDED',
+            'startDate': start_date,
+            'stopDate': stop_date,
+            'output': '{"result": "success"}',
+        }
+
+        result = integrator.check_pipeline_status('arn:test:execution')
+
+        assert result['status'] == 'SUCCEEDED'
+        assert result['startDate'] == start_date
+        assert result['stopDate'] == stop_date
+        assert result['output'] == '{"result": "success"}'
+
+    def test_check_status_running_execution(self, integrator, mock_boto3_clients):
+        """Test check_pipeline_status with running execution (no stopDate/output)."""
+        mock_sfn = mock_boto3_clients['sfn']
+        start_date = datetime(2024, 1, 15, 12, 0, 0)
+        mock_sfn.describe_execution.return_value = {
+            'status': 'RUNNING',
+            'startDate': start_date,
+        }
+
+        result = integrator.check_pipeline_status('arn:test:execution')
+
+        assert result['status'] == 'RUNNING'
+        assert result['startDate'] == start_date
+        assert result['stopDate'] is None
+        assert result['output'] is None
+
+    # --- Promote to production tests ---
+
+    def test_promote_without_pipeline_trigger(
+        self, integrator, mock_boto3_clients, valid_hyperparameters, sample_metrics
+    ):
+        """Test promote_to_production without triggering pipeline."""
+        mock_ssm = mock_boto3_clients['ssm']
+        mock_s3 = mock_boto3_clients['s3']
+        mock_sfn = mock_boto3_clients['sfn']
+
+        mock_ssm.get_parameter.side_effect = mock_ssm.exceptions.ParameterNotFound(
+            'not found'
+        )
+        mock_s3.get_object.side_effect = mock_s3.exceptions.NoSuchKey(
+            {'Error': {'Code': 'NoSuchKey'}}, 'GetObject'
+        )
+
+        result = integrator.promote_to_production(
+            experiment_id='exp-001',
+            hyperparameters=valid_hyperparameters,
+            metrics=sample_metrics,
+            approver='data-science-team',
+            trigger_pipeline=False,
+        )
+
+        assert result['execution_arn'] is None
+        mock_sfn.start_execution.assert_not_called()
+
+    def test_promote_with_pipeline_trigger(
+        self, integrator, mock_boto3_clients, valid_hyperparameters, sample_metrics
+    ):
+        """Test promote_to_production with pipeline trigger enabled."""
+        mock_ssm = mock_boto3_clients['ssm']
+        mock_s3 = mock_boto3_clients['s3']
+        mock_sfn = mock_boto3_clients['sfn']
+
+        mock_ssm.get_parameter.side_effect = mock_ssm.exceptions.ParameterNotFound(
+            'not found'
+        )
+        mock_s3.get_object.side_effect = mock_s3.exceptions.NoSuchKey(
+            {'Error': {'Code': 'NoSuchKey'}}, 'GetObject'
+        )
+        expected_arn = 'arn:aws:states:us-east-1:123456789012:execution:pipeline:run-1'
+        mock_sfn.start_execution.return_value = {'executionArn': expected_arn}
+
+        result = integrator.promote_to_production(
+            experiment_id='exp-001',
+            hyperparameters=valid_hyperparameters,
+            metrics=sample_metrics,
+            approver='data-science-team',
+            trigger_pipeline=True,
+        )
+
+        assert result['execution_arn'] == expected_arn
+        mock_sfn.start_execution.assert_called_once()
+
+    def test_promote_returns_correct_structure(
+        self, integrator, mock_boto3_clients, valid_hyperparameters, sample_metrics
+    ):
+        """Test promote_to_production returns dict with expected keys and values."""
+        mock_ssm = mock_boto3_clients['ssm']
+        mock_s3 = mock_boto3_clients['s3']
+
+        mock_ssm.get_parameter.side_effect = mock_ssm.exceptions.ParameterNotFound(
+            'not found'
+        )
+        mock_s3.get_object.side_effect = mock_s3.exceptions.NoSuchKey(
+            {'Error': {'Code': 'NoSuchKey'}}, 'GetObject'
+        )
+
+        result = integrator.promote_to_production(
+            experiment_id='exp-001',
+            hyperparameters=valid_hyperparameters,
+            metrics=sample_metrics,
+            approver='data-science-team',
+        )
+
+        assert 'promotion_event' in result
+        assert 'execution_arn' in result
+
+        event = result['promotion_event']
+        assert event['experiment_id'] == 'exp-001'
+        assert event['approver'] == 'data-science-team'
+        assert event['metrics'] == sample_metrics
+        assert 'timestamp' in event
+        assert 'backup_key' in event

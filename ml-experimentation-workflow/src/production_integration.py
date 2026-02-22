@@ -33,6 +33,8 @@ Example:
     )
 """
 
+import json
+
 import boto3
 import yaml
 from datetime import datetime
@@ -463,3 +465,164 @@ class ProductionIntegrator:
             Key='production-model-config.yaml',
             Body=yaml.dump(config),
         )
+
+
+    def trigger_production_pipeline(self, experiment_id: str) -> str:
+        """
+        Trigger production pipeline retraining via Step Functions.
+
+        Starts a Step Functions execution for the fraud-detection training
+        pipeline, passing the experiment ID as execution metadata.
+
+        Args:
+            experiment_id: Unique identifier for the experiment whose
+                configuration should be used for retraining.
+
+        Returns:
+            The execution ARN of the started Step Functions execution.
+
+        Raises:
+            RuntimeError: If the Step Functions execution fails to start.
+
+        Example:
+            integrator = ProductionIntegrator()
+            arn = integrator.trigger_production_pipeline('exp-20240115-001')
+            print(f"Pipeline execution started: {arn}")
+        """
+        state_machine_arn = (
+            'arn:aws:states:us-east-1:123456789012:'
+            'stateMachine:fraud-detection-training-pipeline'
+        )
+        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        execution_name = f"experiment-{experiment_id}-{timestamp}"
+
+        try:
+            response = self.sfn_client.start_execution(
+                stateMachineArn=state_machine_arn,
+                name=execution_name,
+                input=json.dumps({
+                    'experimentId': experiment_id,
+                    'triggeredBy': 'experimentation-workflow',
+                }),
+            )
+            return response['executionArn']
+        except self.sfn_client.exceptions.ClientError as e:
+            raise RuntimeError(
+                f"Failed to trigger production pipeline for experiment "
+                f"'{experiment_id}': {e}"
+            )
+
+
+    def check_pipeline_status(self, execution_arn: str) -> Dict[str, Any]:
+        """
+        Check production pipeline execution status.
+
+        Queries Step Functions for the current status of a pipeline execution.
+
+        Args:
+            execution_arn: The ARN of the Step Functions execution to check.
+
+        Returns:
+            A dictionary with keys:
+                - status: Execution status (e.g. 'RUNNING', 'SUCCEEDED', 'FAILED')
+                - startDate: Execution start timestamp
+                - stopDate: Execution stop timestamp (None if still running)
+                - output: Execution output (None if not yet complete)
+
+        Raises:
+            RuntimeError: If the status check fails.
+
+        Example:
+            integrator = ProductionIntegrator()
+            status = integrator.check_pipeline_status(execution_arn)
+            print(f"Pipeline status: {status['status']}")
+        """
+        try:
+            response = self.sfn_client.describe_execution(
+                executionArn=execution_arn,
+            )
+            return {
+                'status': response['status'],
+                'startDate': response['startDate'],
+                'stopDate': response.get('stopDate'),
+                'output': response.get('output'),
+            }
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to check pipeline status for execution "
+                f"'{execution_arn}': {e}"
+            )
+
+
+    def promote_to_production(
+        self,
+        experiment_id: str,
+        hyperparameters: Dict[str, Any],
+        metrics: Dict[str, Any],
+        approver: str,
+        trigger_pipeline: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Complete promotion workflow for an experiment.
+
+        Orchestrates writing hyperparameters to Parameter Store, generating
+        and writing a production config to S3, and optionally triggering
+        the production pipeline.
+
+        Args:
+            experiment_id: Unique identifier for the experiment.
+            hyperparameters: Dictionary of hyperparameter names to values.
+            metrics: Dictionary of performance metric names to values.
+            approver: Name or identifier of the person approving promotion.
+            trigger_pipeline: If True, trigger the production pipeline
+                after writing parameters and config.
+
+        Returns:
+            A dictionary with:
+                - promotion_event: dict with experiment_id, timestamp,
+                  approver, backup_key, and metrics
+                - execution_arn: Step Functions execution ARN if pipeline
+                  was triggered, otherwise None
+
+        Example:
+            integrator = ProductionIntegrator()
+            result = integrator.promote_to_production(
+                experiment_id='exp-001',
+                hyperparameters={'objective': 'binary:logistic', ...},
+                metrics={'accuracy': 0.96},
+                approver='data-science-team',
+                trigger_pipeline=True,
+            )
+        """
+        # Write hyperparameters to Parameter Store
+        backup_key = self.write_hyperparameters_to_parameter_store(
+            hyperparameters, experiment_id=experiment_id,
+        )
+
+        # Generate and write config to S3
+        config = self.generate_production_config(
+            experiment_id, hyperparameters, metrics, approver,
+        )
+        self.write_config_to_s3(config)
+
+        # Build promotion event
+        promotion_event = {
+            'experiment_id': experiment_id,
+            'timestamp': datetime.now().isoformat(),
+            'approver': approver,
+            'backup_key': backup_key,
+            'metrics': metrics,
+        }
+
+        # Optionally trigger pipeline
+        execution_arn = None
+        if trigger_pipeline:
+            execution_arn = self.trigger_production_pipeline(experiment_id)
+
+        return {
+            'promotion_event': promotion_event,
+            'execution_arn': execution_arn,
+        }
+
+
+
