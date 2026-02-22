@@ -12,6 +12,7 @@ A Python toolkit for data scientists to experiment with and optimize fraud detec
 - [Integration with Production Pipeline](#integration-with-production-pipeline)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
+- [Known Limitations and Future Work](#known-limitations-and-future-work)
 - [Troubleshooting](#troubleshooting)
 
 ## System Architecture
@@ -577,6 +578,30 @@ ml-experimentation-workflow/
 ├── requirements.txt                # Python dependencies
 └── README.md
 ```
+
+## Known Limitations and Future Work
+
+### What the experimentation flow produces vs what production uses
+
+The experimentation notebooks generate three categories of insights, but only one is currently consumed by the production pipeline:
+
+| Insight | Produced by | Used by production? | Notes |
+|---------|-------------|---------------------|-------|
+| Optimized hyperparameters | Notebook 02 (grid/random search) | ✅ Yes | Written to Parameter Store, read by TrainHandler at runtime |
+| Best algorithm | Notebook 03 (algorithm comparison) | ❌ No | Production pipeline is hardcoded to XGBoost. RandomForest outperformed XGBoost in testing (accuracy 0.9994 vs 0.9991) but can't be used without pipeline changes |
+| Best feature subset | Notebook 04 (feature selection) | ❌ No | 20 features identified as most important, but the pipeline trains on all features. Feature selection would require changes to the DataPrep stage |
+
+### Gaps to address
+
+- **Algorithm flexibility**: The TrainHandler and CDK Step Functions definition both hardcode the XGBoost container image. Supporting alternative algorithms (RandomForest, LightGBM) would require making the algorithm configurable via Parameter Store or S3 config, and updating the SageMaker container image selection.
+
+- **Feature selection integration**: The experimentation flow identifies optimal feature subsets, but the training pipeline uses all features from the dataset. Integrating feature selection would require the DataPrep stage to filter columns based on a feature list stored in S3 or Parameter Store.
+
+- **Narrow hyperparameter grid**: The default grid search in notebook 02 tests a limited range. For more meaningful optimization, expand the parameter grid (e.g., `eta`: [0.01, 0.05, 0.1, 0.15, 0.2, 0.3], `max_depth`: [3, 5, 7, 9, 12], `num_round`: [50, 100, 150, 200, 300]).
+
+- **SageMaker-specific features**: Bayesian optimization (SageMaker Automatic Model Tuning) and experiment querying (SageMaker Experiments) only work inside SageMaker Studio, not locally. These sections are skipped when running notebooks on a local machine.
+
+- **A/B testing**: The A/B testing module (`ABTestingManager`) requires a deployed SageMaker endpoint and model artifacts. It's not functional until the training pipeline has completed and deployed a production endpoint.
 
 ## Troubleshooting
 
