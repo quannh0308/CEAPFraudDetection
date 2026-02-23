@@ -130,7 +130,7 @@ class EvaluateHandlerTest : FunSpec({
             put("trainingJobName", "fraud-detection-1234567890")
             put("modelArtifactPath", "s3://fraud-detection-models/fraud-detection-1234567890/output/model.tar.gz")
             put("trainingJobStatus", "Completed")
-            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.csv")
         }
         
         // Execute
@@ -212,7 +212,7 @@ class EvaluateHandlerTest : FunSpec({
             put("trainingJobName", "fraud-detection-1234567890")
             put("modelArtifactPath", "s3://fraud-detection-models/fraud-detection-1234567890/output/model.tar.gz")
             put("trainingJobStatus", "Completed")
-            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.csv")
         }
         
         // Execute and verify exception
@@ -286,7 +286,7 @@ class EvaluateHandlerTest : FunSpec({
             put("trainingJobName", "fraud-detection-1234567890")
             put("modelArtifactPath", "s3://fraud-detection-models/fraud-detection-1234567890/output/model.tar.gz")
             put("trainingJobStatus", "Completed")
-            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.csv")
         }
         
         // Execute
@@ -369,7 +369,7 @@ class EvaluateHandlerTest : FunSpec({
             put("trainingJobName", "fraud-detection-1234567890")
             put("modelArtifactPath", "s3://fraud-detection-models/fraud-detection-1234567890/output/model.tar.gz")
             put("trainingJobStatus", "Completed")
-            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.csv")
         }
         
         // Execute and verify exception
@@ -398,7 +398,7 @@ class EvaluateHandlerTest : FunSpec({
         val input = objectMapper.createObjectNode().apply {
             put("trainingJobName", "fraud-detection-1234567890")
             put("trainingJobStatus", "Completed")
-            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.csv")
         }
         
         // Execute and verify exception
@@ -471,7 +471,7 @@ class EvaluateHandlerTest : FunSpec({
             put("trainingJobName", "fraud-detection-1234567890")
             put("modelArtifactPath", "s3://fraud-detection-models/fraud-detection-1234567890/output/model.tar.gz")
             put("trainingJobStatus", "Completed")
-            put("testDataPath", "s3://fraud-detection-data/prepared/test.parquet")
+            put("testDataPath", "s3://fraud-detection-data/prepared/test.csv")
         }
         
         // Execute

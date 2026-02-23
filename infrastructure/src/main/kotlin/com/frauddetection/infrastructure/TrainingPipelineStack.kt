@@ -485,7 +485,7 @@ class TrainingPipelineStack(
                 "workflowBucket" to workflowBucket.bucketName,
                 "initialData" to mapOf(
                     "modelArtifactPath.$" to "$.trainingResult.ModelArtifacts.S3ModelArtifacts",
-                    "testDataPath.$" to "States.Format('{}test.parquet', $.outputPrefix)"
+                    "testDataPath.$" to "States.Format('{}test.csv', $.outputPrefix)"
                 )
             )))
             .outputPath("$.Payload")
