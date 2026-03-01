@@ -215,9 +215,36 @@ open class EvaluateHandler(
                 throw IllegalArgumentException("Invalid S3 path format: $testDataPath")
             }
             val bucket = parts[0]
-            val key = parts[1]
+            var key = parts[1]
             
-            logger.info("Downloading CSV test data from S3: bucket=$bucket, key=$key")
+            logger.info("Loading CSV test data from S3: bucket=$bucket, key=$key")
+            
+            // Spark writes CSV as a directory (test.csv/part-00000.csv)
+            // Try to find the actual CSV part file
+            try {
+                // First, try listing objects under the key as a prefix
+                val prefix = key.trimEnd('/') + "/"
+                val listRequest = software.amazon.awssdk.services.s3.model.ListObjectsV2Request.builder()
+                    .bucket(bucket)
+                    .prefix(prefix)
+                    .build()
+                
+                val listResponse = s3Client.listObjectsV2(listRequest)
+                val csvPartFile = listResponse.contents()
+                    .map { it.key() }
+                    .firstOrNull { k ->
+                        k.endsWith(".csv") && !k.contains("_SUCCESS") && k.contains("part-")
+                    }
+                
+                if (csvPartFile != null) {
+                    logger.info("Found CSV part file: $csvPartFile")
+                    key = csvPartFile
+                } else {
+                    logger.info("No part files found under prefix, trying key as-is: $key")
+                }
+            } catch (e: Exception) {
+                logger.info("Could not list prefix, trying key as-is: $key. Error: ${e.message}")
+            }
             
             val response = s3Client.getObject(
                 software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
@@ -227,8 +254,6 @@ open class EvaluateHandler(
             )
             
             val testRecords = mutableListOf<TestRecord>()
-            
-            // Feature names in order (matching DataPrepHandler output)
             val featureNames = listOf("Time") + (1..28).map { "V$it" } + listOf("Amount")
             
             BufferedReader(InputStreamReader(response)).use { reader ->
