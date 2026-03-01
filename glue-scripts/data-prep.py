@@ -235,6 +235,29 @@ def write_parquet_dataset(df, output_path, dataset_name):
         logger.error(f"Failed to write {dataset_name} dataset to {output_path}: {str(e)}")
         raise
 
+def write_csv_dataset(df, output_path, dataset_name):
+    """
+    Write dataset to S3 in CSV format for Lambda-based evaluation.
+
+    SageMaker XGBoost format: target column first, no header.
+    """
+    logger.info(f"Writing {dataset_name} CSV dataset to {output_path}")
+
+    try:
+        # Reorder columns: target first, then features
+        df_ordered = reorder_columns_for_sagemaker(df)
+
+        # Write as single CSV file (coalesce to 1 partition, no header)
+        df_ordered.coalesce(1).write.mode("overwrite") \
+            .option("header", "false") \
+            .csv(output_path)
+        logger.info(f"Successfully wrote {dataset_name} CSV dataset to {output_path}")
+
+    except Exception as e:
+        logger.error(f"Failed to write {dataset_name} CSV dataset to {output_path}: {str(e)}")
+        raise
+
+
 
 def write_stage_output(workflow_bucket, execution_id, output_data):
     """
@@ -305,6 +328,11 @@ def main():
         write_parquet_dataset(validation_df, validation_path, "validation")
         write_parquet_dataset(test_df, test_path, "test")
         
+        # Also write test data as CSV for Lambda-based evaluation
+        # (Lambda can't use Hadoop/Parquet libraries)
+        test_csv_path = f"{output_prefix}/test.csv"
+        write_csv_dataset(test_df, test_csv_path, "test-csv")
+        
         # Get feature columns (all columns except Class)
         feature_columns = [col for col in df.columns if col != 'Class']
         
@@ -313,6 +341,7 @@ def main():
             "trainDataPath": train_path,
             "validationDataPath": validation_path,
             "testDataPath": test_path,
+            "testCsvDataPath": test_csv_path,
             "recordCounts": record_counts,
             "features": feature_columns,
             "targetColumn": "Class",
